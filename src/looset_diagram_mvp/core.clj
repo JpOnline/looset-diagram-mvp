@@ -4,10 +4,36 @@
     [clojure.test :refer :all]
     ))
 
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (str x "Hello, World!"))
+
+
+(defn file-code-blocks
+  [{:keys [file-list options]
+    :or {options {:indentation-level-to-search 0}}}]
+  (slurp (first file-list))
+  )
 
 (deftest foo-test
-  (is (= "jp Hello, World!" (foo "jp "))))
+  (is (= 2 (file-code-blocks {:file-list "jp"})))
+  (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
+  )
+
+(deftest file-code-blocks
+  (is (= (file-code-blocks {:file-list ["../test/source-code-examples/api.js"]
+                            :options {:indentation-level-to-search 2}})
+         ["getFeatureIdsAt"
+          "getSelectedIds"
+          "getSelected"
+          "getSelectedPoints"
+          "set"
+          "add"
+          "get"
+          "getAll"
+          "delete"
+          "deleteAll"
+          "changeMode"
+          "getMode"
+          "trash"
+          "combineFeatures"
+          "uncombineFeatures"
+          "setFeatureProperty"]))
+  )
