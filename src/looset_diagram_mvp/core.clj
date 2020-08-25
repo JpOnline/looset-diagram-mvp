@@ -1,14 +1,11 @@
 (ns looset-diagram-mvp.core
   (:require
+    [clojure.set]
+    [looset-diagram-mvp.util :as util]
 
     [clojure.test :refer :all]
     [clojure.pprint :refer [pprint]]
     ))
-
-(defn get-pred
-  "Returns the first element of coll that satisfy the predicate f."
-  [f coll]
-  (some #(if (f %) %) coll))
 
 (def token-finite-automata
   {:first-char [{:regex #"[0-9]" :next-state :number}
@@ -20,7 +17,7 @@
    :new-line [{:regex #"[\s\S]" :next-state :first-char}]
    :word [{:regex #"[\s\n()\[\]{}<>]" :next-state :first-char}
           {:regex #"[0-9\-_a-zA-Z]" :next-state :word}
-          {:regex #"\W" :next-state :symbol}]
+          {:regex #"\W" :next-state :first-char}]
    :symbol [{:regex #"[\s\S]" :next-state :first-char}]
    :space [{:regex #"[\S\s]" :next-state :first-char}]
    :number [{:regex #"[\s\n()\[\]{}<>]" :next-state :first-char}]
@@ -43,43 +40,41 @@
                                   :state (:state big-state)}))))
 
 (defn compute-token [{:keys [state token char] :as big-state} next-state]
-  (cond
-    (and (= state next-state) (nil? token)) (assoc big-state :token (str char))
-    (and (= state next-state) (not (nil? token))) (update big-state :token str char)
-    (and (not= state next-state) (nil? token))
-      (-> big-state
-          (update-in [:token-occurrencies (str char)] #(if (nil? %) 1 (inc %))))
-    (and (not= state next-state) (not (nil? token)))
-      (-> big-state
-          (update-in [:token-occurrencies (str token char)] #(if (nil? %) 1 (inc %)))
-          (dissoc :token)
-          )))
+  (if (= state next-state)
+    (update big-state :token str char)
+    (-> big-state
+        (update-in [:token-occurrencies (str token char)] #(if (nil? %) 1 (inc %)))
+        (update :token-list conj (-> big-state
+                                     (update :token str char)
+                                     (select-keys [:token-position :token :category])
+                                     (clojure.set/rename-keys {:token-position :position})
+                                     ))
+        (dissoc :token)
+        )))
 
-(defn process-char [{:keys [next-char next-state] :as big-state}]
+(defn process-char [{:keys [next-char next-state state position] :as big-state}]
   (-> big-state
       (update :position (fn [[lin column]] (if (= \newline next-char) [(inc lin) 1] [lin (inc column)])))
       (update :counter #(if (nil? %) 0 (inc %)))
       (compute-token next-state)
+      (update :category #(if (= state :first-char) next-state %))
+      (update :token-position #(if (= state :first-char) position %))
       (assoc :state next-state)
       (assoc :char next-char))
   )
 
-(defn initialize-state [code-to-process]
-  {:position [1 1]
-   :char (first code-to-process)
-   :state :first-char
-   :token-occurrencies {}})
-
 (defn lexical-analyzer [{:keys [state counter] :as big-state} code-to-process]
-  ;; (println)
-  ;; (pprint big-state)
   (let [char (first code-to-process)
         transitions (state token-finite-automata)
-        {:keys [next-state]} (get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)
+        {:keys [next-state]} (util/get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)
         {:keys [next-state] :as big-state} (-> big-state
                                                (assoc :next-char char)
                                                (assoc :next-state next-state)
-                                               (handle-exception))]
+                                               (handle-exception))
+        ;; big-state (if (= state :first-char) (assoc big-state :category next-state) big-state)
+        ;; _ (println)
+        ;; _ (pprint big-state)
+        ]
   (cond
     ;; Only to avoid infinity loop
     ;; (= 1000 counter)
@@ -90,7 +85,7 @@
 
     (= next-state :first-char)
     (-> big-state
-        (update :counter #(if (nil? %) 0 (inc %)))
+        ;; (update :counter #(if (nil? %) 0 (inc %)))
         (assoc :state next-state)
         (recur code-to-process))
 
@@ -99,6 +94,20 @@
         (process-char)
         (recur (rest code-to-process))
         ))))
+
+(defn generate-token-list [code-to-process]
+  (let [char (first code-to-process)
+        transitions (:first-char token-finite-automata)
+        {:keys [next-state]} (util/get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)]
+    (lexical-analyzer
+      {:position [1 2]
+       :char (first code-to-process)
+       :state next-state
+       :token-position [1 1]
+       :category next-state
+       :token-list []
+       :token-occurrencies {}}
+      (rest code-to-process))))
 
 (defn file-code-blocks
   [{:keys [file-path options]
@@ -110,7 +119,7 @@
   (re-find #"." (str (nth (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
                                38
                                )))
-  (re-find #"\n" "\n")
+  (re-find #"[\-_]" "'")
   (update {:a '({:b 5})} :a conj {:b 3})
   (pprint (reduce lexical-analyzer
           {:position [1 1]
@@ -119,30 +128,35 @@
              :token-occurrencies {}}
           "m 'lodash.isequal';"
           #_(drop 5 (take 8 (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")))))
-  (pprint (update (lexical-analyzer
-                    (initialize-state "i")
-                    ;; "import isEqual from 'lodash.isequal';\nimport"
-                    (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
+  (pprint (update (generate-token-list
+                    ;; "import 'lodash.isequal';\nimport somethinelse"
+                    (take 300 (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js"))
                     )
                   :token-occurrencies #(sort-by val %)))
                   ;; (take 4 (reverse (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")))  
+  (pprint (:token-list (generate-token-list (take 300 (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")) #_"import 'lodash.isequal';\nimport somethinelse")))
   )
 
 (deftest lexical-analyzer-test
   (let [file (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")]
     (is (= 12
-           (-> (initialize-state file)
-               (lexical-analyzer file)
+           (-> (generate-token-list file)
                :token-occurrencies
                (get "import" 0)
                ))))
   (let [file (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")]
     (is (= 35
-           (-> (initialize-state file)
-               (lexical-analyzer file)
+           (-> (generate-token-list file)
                :token-occurrencies
                (get "api" 0)
-               )))))
+               ))))
+  (let [file (take 300 (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js"))]
+    (is (= {:token "const", :category :word, :position [7 31]}
+           (-> (generate-token-list file)
+               :token-list
+               last
+               ))))
+  )
 
 (deftest file-code-blocks
   (is (= (file-code-blocks {:file-list ["../test/source-code-examples/api.js"]
