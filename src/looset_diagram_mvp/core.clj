@@ -55,7 +55,6 @@
 (defn process-char [{:keys [next-char next-state state position] :as big-state}]
   (-> big-state
       (update :position (fn [[lin column]] (if (= \newline next-char) [(inc lin) 1] [lin (inc column)])))
-      (update :counter #(if (nil? %) 0 (inc %)))
       (compute-token next-state)
       (update :category #(if (= state :first-char) next-state %))
       (update :token-position #(if (= state :first-char) position %))
@@ -63,7 +62,7 @@
       (assoc :char next-char))
   )
 
-(defn lexical-analyzer [{:keys [state counter] :as big-state} code-to-process]
+(defn lexical-analyzer [{:keys [state] :as big-state} code-to-process]
   (let [char (first code-to-process)
         transitions (state token-finite-automata)
         {:keys [next-state]} (util/get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)
@@ -71,13 +70,12 @@
                                                (assoc :next-char char)
                                                (assoc :next-state next-state)
                                                (handle-exception))
-        ;; big-state (if (= state :first-char) (assoc big-state :category next-state) big-state)
+        ;; big-state (update big-state :counter #(if (nil? %) 0 (inc %)))
         ;; _ (println)
         ;; _ (pprint big-state)
         ]
   (cond
-    ;; Only to avoid infinity loop
-    ;; (= 1000 counter)
+    ;; (> (:counter big-state) 100)
     ;; big-state
 
     (nil? char)
@@ -85,9 +83,20 @@
 
     (= next-state :first-char)
     (-> big-state
-        ;; (update :counter #(if (nil? %) 0 (inc %)))
         (assoc :state next-state)
         (recur code-to-process))
+
+    (and (= next-state :symbol)
+         (= \/ (first code-to-process) (second code-to-process)))
+    (-> big-state
+        (process-char)
+        (update-in [:position 0] inc)
+        (assoc-in [:position 1] 1)
+        (assoc :category :line-comment)
+        (assoc :token "/")
+        (assoc :char "/")
+        (recur (rest (drop-while #(not= \newline %) code-to-process)))
+        )
 
     :else
     (-> big-state
@@ -96,7 +105,8 @@
         ))))
 
 (defn generate-token-list [code-to-process]
-  (let [char (first code-to-process)
+  (let [code-to-process (concat code-to-process (seq "\nEOF"))
+        char (first code-to-process)
         transitions (:first-char token-finite-automata)
         {:keys [next-state]} (util/get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)]
     (lexical-analyzer
@@ -115,7 +125,7 @@
   (slurp file-path)
   )
 
-(deftest foo-test
+(comment
   (re-find #"." (str (nth (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
                                38
                                )))
@@ -154,28 +164,18 @@
     (is (= {:token "const", :category :word, :position [7 31]}
            (-> (generate-token-list file)
                :token-list
-               last
+               reverse
+               (nth 2)
                ))))
+  (is (= {"abc" 1, "//" 2, "oi" 1, "/" 1 "oci" 1, "lc" 1, "\n" 1, "EOF" 1}
+         (-> "abc//w\noi/oci//b\nlc"
+             generate-token-list
+             ;; pprint
+             :token-occurrencies
+             )))
+  (is (= {"abc" 1, "//" 1, "EOF" 1}
+         (-> "abc//woi/oci//blc"
+             generate-token-list
+             :token-occurrencies
+             )))
   )
-
-(deftest file-code-blocks
-  (is (= (file-code-blocks {:file-list ["../test/source-code-examples/api.js"]
-                            :options {:indentation-level-to-search 2}})
-         ["getFeatureIdsAt"
-          "getSelectedIds"
-          "getSelected"
-          "getSelectedPoints"
-          "set"
-          "add"
-          "get"
-          "getAll"
-          "delete"
-          "deleteAll"
-          "changeMode"
-          "getMode"
-          "trash"
-          "combineFeatures"
-          "uncombineFeatures"
-          "setFeatureProperty"]))
-  )
-

@@ -1,0 +1,113 @@
+"trash" -> {"trash" "events" "render" "ctx" "onTrash"}
+"sources" -> {}
+"stop" -> {"stop" "onStop"}
+"mousedown" -> {"mousedown" "const" "ctx"}
+"deleteAll" -> {"getMode" "delete" "events" "changeMode" "render" "modes" "ctx"}
+"getMode" -> {"getMode" "events" "ctx"}
+"onRemove" -> {"connect" "removeLayers" "events" "ctx"}
+"isEnterKey" -> {}
+"onTap" -> {"clickOnVertex" "id" "cursors" "events" "changeMode" "isVertex" "toGeoJSON" "modes" "clickAnywhere" "updateCoordinate"}
+"internal" -> {"id" "const" "geojsonTypes" "meta" "getCoordinates" "ctx" "activeStates"}
+"featuresAtTouch" -> {"ctx"}
+"defaultOptions" -> {"modes"}
+"showControls" -> {"trash"}
+"getSelectedPoints" -> {"geojsonTypes" "ctx"}
+"setFeatureProperty" -> {"setFeatureProperty" "ctx"}
+"prototype" -> {"const"}
+"fireActionable" -> {"trash" "combineFeatures" "uncombineFeatures" "let" "const" "getSelected"}
+"hideControls" -> {"trash"}
+"delete" -> {"getMode" "delete" "getSelectedIds" "events" "changeMode" "render" "modes" "has" "ctx"}
+"isFeature" -> {"meta"}
+"export" -> {"sources" "internal" "featuresAtTouch" "defaultOptions" "showControls" "hideControls" "incomingCoords" "id" "click" "let" "cursors" "const" "start" "featuresAtClick" "classes" "function" "events" "geojsonTypes" "render" "meta" "getCoordinates" "toGeoJSON" "ctx" "getSelected" "activeStates" "get"}
+"mouseout" -> {"mouseout"}
+"function-e" -> {"delete" "geojsonTypes"}
+"incomingCoords" -> {"setCoordinates" "changed"}
+"onMouseMove" -> {"cursors" "isVertex" "updateCoordinate"}
+"mousedrag" -> {"drag" "events"}
+"fireUpdate" -> {"action" "events" "toGeoJSON" "getSelected" "updateActions"}
+"clickOnVertex" -> {"id" "changeMode" "modes"}
+"getCoordinate" -> {"getCoordinate" "id" "const" "getCoordinates"}
+"onKeyUp" -> {"isEnterKey" "id" "changeMode" "modes" "isEscapeKey" "stopDrawingAndRemove"}
+"combineFeatures" -> {"combineFeatures" "events" "ctx"}
+"getFeatureIdsAt" -> {"id" "click" "const" "ctx"}
+"enable" -> {"enable" "ctx"}
+"getAll" -> {"getAll" "geojsonTypes" "toGeoJSON" "ctx"}
+"id" -> {"id"}
+"getSelectedIds" -> {"getSelectedIds" "ctx"}
+"uncombineFeatures" -> {"uncombineFeatures" "events" "ctx"}
+"noTarget" -> {}
+"toDisplayFeatures" -> {"id" "const" "geojsonTypes" "meta" "activeStates"}
+"types" -> {}
+"click" -> {"click"}
+"createSupplementaryPoints" -> {"id" "createSupplementaryPoints" "let" "const" "function" "geojsonTypes"}
+"META_TYPES" -> {"meta"}
+"buffer" -> {"id" "META_TYPES" "buffer" "const" "meta" "add" "has" "ctx"}
+"onSetup" -> {"trash" "fireActionable" "combineFeatures" "id" "uncombineFeatures" "types" "let" "cursors" "const" "start" "disable" "geojsonTypes" "addCoordinate"}
+"drag" -> {"drag"}
+"setCoordinates" -> {"_coordinatesToFeatures" "changed"}
+"mousemove" -> {"mousedrag" "mousemove" "const" "events" "ctx"}
+"keydown" -> {"keydown"}
+"removeCoordinate" -> {"removeCoordinate" "const" "changed"}
+"mouseup" -> {"click" "mouseup" "const" "ctx"}
+"let" -> {"const" "render" "ctx"}
+"cursors" -> {"drag" "add"}
+"connect" -> {"connect" "events" "ctx" "addLayers"}
+"isTrue" -> {}
+"isShiftMousedown" -> {}
+"const" -> {"id" "ctx"}
+"touchmove" -> {"touchmove"}
+"start" -> {"onSetup" "let" "const" "on"}
+"featuresAtClick" -> {"ctx"}
+"disable" -> {"disable" "ctx"}
+"touchend" -> {"touchend"}
+"action" -> {"const" "action"}
+"classes" -> {}
+"on" -> {}
+"isInactiveFeature" -> {"meta" "activeStates"}
+"removeLayers" -> {"sources" "id" "ctx"}
+"stopExtendedInteractions" -> {"enable"}
+"function" -> {"sources" "id" "let" "const" "geojsonTypes" "add"}
+"events" -> {"delete" "render"}
+"_coordinatesToFeatures" -> {"id" "const" "geojsonTypes" "ctx"}
+"isValid" -> {"isValid"}
+"isActiveFeature" -> {"meta" "activeStates"}
+"changeMode" -> {"getMode" "getSelectedIds" "events" "changeMode" "render" "modes" "ctx"}
+"geojsonTypes" -> {}
+"render" -> {"toDisplayFeatures"}
+"isDrag" -> {"drag" "cursors" "isDrag" "ctx"}
+"isVertex" -> {"const" "meta"}
+"touchstart" -> {"touchstart"}
+"meta" -> {}
+"changed" -> {"id" "ctx"}
+"getCoordinates" -> {"geojsonTypes" "getCoordinates"}
+"toGeoJSON" -> {"id" "geojsonTypes" "getCoordinates"}
+"keyup" -> {"keyup"}
+"modes" -> {}
+"setProperty" -> {}
+"add" -> {"incomingCoords" "id" "const" "render" "getCoordinates" "add" "has" "ctx" "get"}
+"set" -> {"delete" "id" "let" "const" "geojsonTypes" "add" "has" "ctx"}
+"getUniqueIds" -> {"id" "const" "add" "reduce"}
+"touchdrag" -> {"drag" "events"}
+"onAdd" -> {"enable" "let" "connect" "const" "start" "disable" "on" "function" "events" "ctx"}
+"has" -> {}
+"clickAnywhere" -> {"id" "cursors" "changeMode" "modes" "addCoordinate" "updateCoordinate"}
+"reduce" -> {"modes" "ctx"}
+"ctx" -> {"delete" "_coordinatesToFeatures" "ctx" "models"}
+"clear" -> {}
+"let-e" -> {}
+"addCoordinate" -> {"id" "const" "changed" "addCoordinate"}
+"models" -> {}
+"onStop" -> {"getCoordinate" "enable" "id" "removeCoordinate" "cursors" "events" "isValid" "changeMode" "toGeoJSON" "modes"}
+"getFeatures" -> {}
+"getSelected" -> {"id" "getSelectedIds" "geojsonTypes" "toGeoJSON" "ctx" "get"}
+"updateCoordinate" -> {"id" "const" "changed" "updateCoordinate"}
+"isEscapeKey" -> {}
+"activeStates" -> {}
+"get" -> {"id" "const" "toGeoJSON" "ctx" "get"}
+"tap" -> {"tap"}
+"addLayers" -> {"sources" "geojsonTypes" "render" "ctx"}
+"isOfMetaType" -> {"const" "function" "meta"}
+"updateActions" -> {}
+"onTrash" -> {"id" "changeMode" "modes"}
+"isShiftDown" -> {}
+"stopDrawingAndRemove" -> {"id" "changeMode" "modes"}

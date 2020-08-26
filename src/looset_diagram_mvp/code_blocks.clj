@@ -48,8 +48,8 @@
         (update-cb-line-id token))
 
     (and (= :initial-state state)
-         (= :center (indentation-position big-state))
-         (= :new-line (token :category)))
+         (#{:center :left :right} (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
     (-> big-state
         (assoc :indentation-level 0))
 
@@ -63,10 +63,17 @@
          (#{:number symbol} (token :category)))
     (assoc big-state :state :cb-first-line)
 
-    ;; (and (= :initial-state state)
-    ;;      (#{:left :right} (indentation-position big-state)))
-    ;; (-> big-state
-    ;;     (assoc :state :ignore-line))
+    (and (= :initial-state state)
+         (#{:left} (indentation-position big-state))
+         (#{:space} (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :initial-state state)
+         (#{:left} (indentation-position big-state))
+         (#{:number :symbol :word} (token :category)))
+    (-> big-state
+        (assoc :state :ignore-line))
 
     (and (= :cb-first-line state)
          (= :word (token :category)))
@@ -74,34 +81,105 @@
         (update-cb-line-id token))
 
     (and (= :cb-first-line state)
-         (= :new-line (token :category)))
+         (#{:line-comment :new-line} (token :category)))
     (-> big-state
         (assoc :indentation-level 0)
-        (assoc :state :cb-new-internal-line))
+        (assoc :state :cb-second-line))
 
     (and (= :cb-first-line state)
          (#{:space :symbol :number} (token :category)))
     big-state
 
-    (and (= :cb-new-internal-line state)
-         (#{:center :right} (indentation-position big-state))
+    (and (= :cb-second-line state)
+         (#{:center} (indentation-position big-state))
+         (= :word (token :category)))
+    (-> big-state
+        (assoc :state :cb-first-line)
+        (update-cb-line-id token))
+
+    (and (= :cb-second-line state)
+         (#{:center} (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :cb-first-line)
+        (update-cb-line-id token))
+
+    (and (= :cb-second-line state)
+         (#{:right} (indentation-position big-state))
          (= :word (token :category)))
     (-> big-state
         (assoc :state :inside-cb)
         (update-words-in-cb token))
 
-    (and (= :cb-new-internal-line state)
-         (= :new-line (token :category)))
+    (and (= :cb-second-line state)
+         (#{:left} (indentation-position big-state))
+         (= :word (token :category)))
     (-> big-state
-        (assoc :state :initial-state)
-        (assoc :indentation-level 0)
-        (record-code-block))
+        (assoc :state :ignore-line))
 
-    (and (= :cb-new-internal-line state)
+    (and (= :cb-second-line state)
+         (#{:left} (indentation-position big-state))
+         (#{:number :symbol :word} (token :category)))
+    (-> big-state
+        (assoc :state :ignore-line))
+
+    (and (= :cb-second-line state)
+         (#{:left} (indentation-position big-state))
+         (#{:space} (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :cb-second-line state)
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0)
+        (assoc :state :cb-second-line-with-blank-line))
+
+    (and (= :cb-second-line state)
          (#{:center :right} (indentation-position big-state))
          (= :space (token :category)))
     (-> big-state
         (update :indentation-level inc))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :center (indentation-position big-state))
+         (= :word (token :category)))
+    (-> big-state
+        (assoc :state :cb-first-line)
+        (dissoc :cb-line-id)
+        (update-cb-line-id token))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :center (indentation-position big-state))
+         (= :space (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :right (indentation-position big-state))
+         (= :word (token :category)))
+    (-> big-state
+        (assoc :state :inside-cb)
+        (update-words-in-cb token))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :right (indentation-position big-state))
+         (= :space (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (#{:left} (indentation-position big-state))
+         (#{:space} (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :inside-cb state)
+         (#{:center :left} (indentation-position big-state))
+         (#{:word :symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :initial-state)
+        (update-words-in-cb token))
 
     (and (= :inside-cb state)
          (= :word (token :category)))
@@ -109,25 +187,67 @@
         (update-words-in-cb token))
 
     (and (= :inside-cb state)
-         (= :new-line (token :category)))
+         (#{:line-comment :new-line} (token :category)))
     (-> big-state
-        (assoc :state :cb-new-internal-line)
+        (assoc :state :inside-cb-new-line)
         (assoc :indentation-level 0))
 
     (and (= :inside-cb state)
          (#{:space :symbol :number} (token :category)))
     big-state
 
-    (and (= :cb-new-internal-line state)
-         (= :new-line (token :category)))
+    (and (= :inside-cb-new-line state)
+         (#{:center :left} (indentation-position big-state))
+         (#{:word :symbol :number} (token :category)))
     (-> big-state
-        (dissoc :cb-line-id)
-        (assoc :indentation-level 0)
-        (assoc :state :initial-state))
+        (assoc :state :cb-last-line)
+        (record-code-block))
 
-    ;; (and (= :cb-new-internal-line state)
-    ;;      (= :space (token :category)))
+    (and (= :inside-cb-new-line state)
+         (#{:right} (indentation-position big-state))
+         (#{:word} (token :category)))
+    (-> big-state
+        (assoc :state :inside-cb)
+        (update-words-in-cb token))
 
+    (and (= :inside-cb-new-line state)
+         (#{:right} (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :inside-cb)
+        (update-words-in-cb token))
+
+    (and (= :inside-cb-new-line state)
+         (#{:space} (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :inside-cb-new-line state)
+         (#{:center :left :right} (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0))
+
+    (and (= :ignore-line state)
+         (#{:center :left :right} (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :state :initial-state)
+        (assoc :indentation-level 0))
+
+    (and (= :ignore-line state)
+         (#{:center :left :right} (indentation-position big-state))
+         (#{:number :symbol :space :word} (token :category)))
+    big-state
+
+    (and (= :cb-last-line state)
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :state :initial-state)
+        (assoc :indentation-level 0))
+
+    (and (= :cb-last-line state))
+    big-state
 
     :else
     (-> big-state
@@ -136,60 +256,94 @@
                                  (dissoc :errors))))
     ))
 
-(defn code-blocks-identifier
+(defn identifier
   ([{:keys [token-list] :as big-state}]
-   (code-blocks-identifier token-list (merge {:state :initial-state :indentation-level-to-search 0 :indentation-level 0}
-                                             (dissoc big-state :token-list))))
+   (identifier token-list (merge {:state :initial-state :indentation-level-to-search 0 :indentation-level 0}
+                                 (dissoc big-state :token-list))))
   ([[token & token-list] big-state]
    (when token
      (let [big-state (process-token (assoc big-state :token token))
-           tail (lazy-seq (code-blocks-identifier token-list big-state))]
+           ;; tail (lazy-seq (identifier token-list big-state))
+           tail (when (not (:errors big-state)) (lazy-seq (identifier token-list big-state)))]
        (cons (-> big-state (dissoc :token-list :token-occurrencies))
              tail)
        #_(str (:state big-state) (apply str tail))))))
 
-(deftest experimentation-test
-  (process-token {:state :c, :token  {:token "isEqual", :category :word, :position  [1 8]}})
-  (pprint (code-blocks-identifier [{:token "isEqual", :category :word, :position  [1 8]}
-                           {:token "const", :category :word, :position [7 31]}]))
-  (-> (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
-      (->> (take 580))
-      (concat "\n\n")
-      lexical-analyzer/generate-token-list
-      (select-keys [:token-list :token-occurrencies])
-      code-blocks-identifier
-      reverse
-      (->> (take 5))
-      ;; last
-      pprint
-      )
+(comment
+  (process-token {:state :cb-first-line :indentation-level-to-search 0 :indentation-level 2 :token {:token "\n", :category :new-line, :position [141 27]} :cb-line-id "export"})
+  (pprint (identifier {:token-list {:token "isEqual", :category :word, :position  [1 8]}}
+                                  {:token "const", :category :word, :position [7 31]}))
+   (-> (slurp "/home/smokeonline/projects/mapbox-gl-draw/src/modes/draw_polygon.js")
+       lexical-analyzer/generate-token-list
+       (select-keys [:token-list :token-occurrencies])
+       identifier
+       reverse
+       (nth 3)
+       ;; :code-blocks
+       ;; keys
+       pprint
+       #_set)
   )
 
-(deftest code-blocks-identifier-test
+(deftest identifier-test
   (is (= "im"
          (let [initial-value (-> "im import"
                                  (lexical-analyzer/generate-token-list)
                                  (select-keys [:token-list :token-occurrencies]))]
-           (:cb-line-id (last (code-blocks-identifier initial-value))))
+           (:cb-line-id (last (identifier initial-value))))
          ))
   (is (= "import"
          (let [initial-value (-> "im im import"
                                  (lexical-analyzer/generate-token-list)
                                  (select-keys [:token-list :token-occurrencies]))]
-           (:cb-line-id (last (code-blocks-identifier initial-value))))
+           (:cb-line-id (last (identifier initial-value))))
          ))
-  (is (= {"x" #{"import" "y"}}
-         (-> "import x\nimport y\n\n"
+  (is (= "import"
+         (-> "im im import"
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
-             code-blocks-identifier
+             identifier
              last
-             :code-blocks)))
+             :cb-line-id
+             ;; pprint
+             )))
   (is (= {"export" #{"inside"}}
          (-> "export default function(ctx, api) {\n\n  inside\n\n"
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
-             code-blocks-identifier
+             identifier
              last
              :code-blocks)))
+  (is (= {"export" #{"inside"}}
+         (->  "export default function(ctx, api)  \n  inside\n\n"
+             lexical-analyzer/generate-token-list
+             (select-keys [:token-list :token-occurrencies])
+             identifier
+             last
+             :code-blocks)))
+  (is (= {"export" #{"inside"}}
+         (->  "export default function(ctx, api)\n{\n  inside\n\n"
+             lexical-analyzer/generate-token-list
+             (select-keys [:token-list :token-occurrencies])
+             identifier
+             last
+             :code-blocks)))
+  (is (= ["featureTypes" "export"]
+         (-> (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
+             lexical-analyzer/generate-token-list
+             (select-keys [:token-list :token-occurrencies])
+             identifier
+             last
+             :code-blocks
+             keys)))
+  (is (= #{"getFeatureIdsAt" "getSelectedIds" "getSelected" "getSelectedPoints" "set" "add" "get" "getAll" "delete" "deleteAll" "changeMode" "getMode" "trash" "combineFeatures" "uncombineFeatures" "setFeatureProperty"}
+         (-> (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
+             lexical-analyzer/generate-token-list
+             (select-keys [:token-list :token-occurrencies])
+             (merge {:indentation-level-to-search 2})
+             identifier
+             last
+             :code-blocks
+             keys
+             set)))
   )
