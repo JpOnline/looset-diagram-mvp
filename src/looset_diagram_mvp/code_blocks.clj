@@ -164,6 +164,12 @@
 
     (and (= :cb-second-line-with-blank-line state)
          (= :right (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :right (indentation-position big-state))
          (= :space (token :category)))
     (-> big-state
         (update :indentation-level inc))
@@ -346,4 +352,15 @@
              :code-blocks
              keys
              set)))
+  (is (= #{"onSetup" "fireUpdate" "fireActionable" "getUniqueIds" "stopExtendedInteractions" "onStop" "onMouseMove" "onMouseOut" "onTap" "clickAnywhere" "clickOnVertex" "startOnActiveFeature" "clickOnFeature" "onMouseDown" "startBoxSelect" "onTouchStart" "onDrag" "whileBoxSelect" "dragMove" "onMouseUp" "toDisplayFeatures" "onTrash" "onCombineFeatures" "onUncombineFeatures"}
+         (-> (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js")
+             lexical-analyzer/generate-token-list
+             (select-keys [:token-list :token-occurrencies])
+             (merge {:indentation-level-to-search 0})
+             identifier
+             last
+             :code-blocks
+             keys
+             set
+             )))
   )

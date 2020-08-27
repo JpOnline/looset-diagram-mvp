@@ -19,15 +19,17 @@
       last
       (select-keys [:code-blocks :file-path])))
 
+;; It's better to use with-file-path to avoid duplicated keys
 (defn file-code-blocks-with-file-path [{:keys [file-path] :as info}]
   (->> info
       file-info-with-code-blocks
       :code-blocks
       (map (fn [[k v]] {(str file-path "<>" k) v}))
-      (apply merge)))
+      (apply merge)
+      (assoc {} :code-blocks)))
 
 ;; It's still a copy of merge-with, I need to change it accordanly.
-(defn merge-with-key-changer
+#_(defn merge-with-key-changer
   "Like merge-with, but instead of changing the value, it changes the key."
   [f & maps]
   (when (some identity maps)
@@ -41,13 +43,60 @@
       (reduce1 merge2 maps))))
 
 (defn filter-cb-identifiers [code-blocks]
-  (let [cb-identifiers (conj (set (keys code-blocks)) "DUPLICATED KEY!!")]
+  (let [cb-identifiers (-> code-blocks
+                           keys
+                           (->> (map #(clojure.string/replace % #"^.*<>" "")))
+                           set
+                           (conj "DUPLICATED KEY!!"))]
     (apply merge (map (fn [[k v]] {k (set (filter cb-identifiers v))}) code-blocks))))
 
 (defn code-block-to-dot-syntax [[identifier references]]
   (let [sq #(str "\""%"\"")]
-    (str (sq identifier)" -> {"(clojure.string/join " " (map sq references))"}"))
+    (str (sq identifier)" -> {"(clojure.string/join " " (map sq references))"}")))
+
+(defn from-file-list [cb-identifier-fn file-list]
+  (->> file-list
+       (map cb-identifier-fn)
+       (map :code-blocks)
+       ;; (apply (partial merge-with (constantly #{"DUPLICATED KEY!!"}))) ;; Use merge-with-key-changer instead?
+       (apply (partial merge-with clojure.set/union))
+       (filter-cb-identifiers)
+       (map code-block-to-dot-syntax)
+       (clojure.string/join "\n")))
+
+(def from-file-list-no-path (partial from-file-list file-info-with-code-blocks))
+
+(def from-file-list-with-path (partial from-file-list file-code-blocks-with-file-path))
+
+(defn file-list->graph [file-list]
+  (->> file-list
+       (map file-code-blocks-with-file-path)
+       (map :code-blocks)
+       ;; (apply (partial merge-with (constantly #{"DUPLICATED KEY!!"}))) ;; Use merge-with-key-changer instead?
+       (apply (partial merge-with clojure.set/union))
+       (filter-cb-identifiers))
   )
+
+(defn graph->DOT-syntax [graph]
+  (let [my-fn (fn [val [k v]] (conj val {k v}))]
+    (reduce my-fn {} graph)
+    )
+  )
+
+(defn clean-file-path [graph]
+  (let [del-more #(clojure.string/replace % #"^.*<>" "")
+        freqs (frequencies (map del-more (keys graph)))
+        del-less (comp clojure.string/reverse #(re-find #"^[^>]*><[^/]*/" %) clojure.string/reverse)
+        clean (fn [val [k v]] (if (> (freqs (del-more k)) 1)
+                                (conj val {(del-less k) v})
+                                (conj val {(del-more k) v})))]
+    (reduce clean {} graph)))
+
+(defn clear-whitespaces
+  "Deletes whitespaces after a new line character (\n)
+  It is used to enable correct indentation in tests."
+  [s]
+  (clojure.string/replace s #"\n\s*" "\n"))
 
 (comment
   (:file-path (file-info-with-code-blocks {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"}))
@@ -55,59 +104,173 @@
   (file-info-with-code-blocks {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"})
   (-> {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"}
     (file-info-with-code-blocks)
-    :code-blocks
-    )
-  (->> [{:indentation-level-to-search 2 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/api.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/constants.js"}
-        {:indentation-level-to-search 2 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/events.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/feature_types/feature.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/feature_types/line_string.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/feature_types/multi_feature.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/feature_types/point.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/feature_types/polygon.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/common_selectors.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/constrain_feature_movement.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/create_midpoint.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/create_supplementary_points.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/create_vertex.js"}
-        {:indentation-level-to-search 2 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/double_click_zoom.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/euclidean_distance.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/features_at.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/get_features_and_set_cursor.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/is_click.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/is_event_at_coordinates.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/is_tap.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/map_event_to_bounding_box.js"}
-        {:indentation-level-to-search 4 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/mode_handler.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/mouse_event_point.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/move_features.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/sort_features.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/string_set.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/string_sets_are_equal.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/theme.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/lib/to_dense_array.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/direct_select.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/draw_line_string.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/draw_point.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/draw_polygon.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/index.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/mode_interface_accessors.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/mode_interface.js"}
-        {:indentation-level-to-search 6 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/object_to_mode.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/modes/simple_select.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/options.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/render.js"}
-        {:indentation-level-to-search 4 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/setup.js"}
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/store.js"}
-        {:indentation-level-to-search 2 :file-path "/home/smokeonline/projects/mapbox-gl-draw/src/ui.js"}
-        ]
-      (map file-info-with-code-blocks)
-      (map :code-blocks)
-      ;; (apply (partial merge-with (constantly #{"DUPLICATED KEY!!"}))) ;; Use merge-with-key-changer instead?
-      (apply (partial merge-with clojure.set/union))
-      (filter-cb-identifiers)
-      (map code-block-to-dot-syntax)
-      (clojure.string/join "\n")
-      (spit "resulted-graph-in-DOT.txt")
+    :code-blocks)
+  (->> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
+        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
+       (file-list->graph)
+       ;; graph->DOT-syntax
+       (#(with-out-str (pprint %)))
+       (spit "tmp.txt")
+       )
+  (-> "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
+      clojure.string/reverse
+      (->> (re-find #"^[^>]*><[^/]*/"))
+      clojure.string/reverse
       )
+
   )
+
+(deftest from-file-list-test
+  (is (=
+       (clear-whitespaces
+         "\"onTap\" -> {\"clickOnVertex\" \"clickOnFeature\" \"clickAnywhere\"}
+         \"onMouseOut\" -> {\"fireUpdate\"}
+         \"startOnActiveFeature\" -> {\"stopExtendedInteractions\"}
+         \"onDrag\" -> {\"dragMove\" \"whileBoxSelect\"}
+         \"fireActionable\" -> {}
+         \"dragMove\" -> {}
+         \"onMouseMove\" -> {\"stopExtendedInteractions\"}
+         \"fireUpdate\" -> {}
+         \"clickOnVertex\" -> {}
+         \"onKeyUp\" -> {}
+         \"toDisplayFeatures\" -> {\"fireActionable\"}
+         \"onMouseDown\" -> {\"startOnActiveFeature\" \"startBoxSelect\"}
+         \"onSetup\" -> {\"fireActionable\"}
+         \"startBoxSelect\" -> {\"stopExtendedInteractions\"}
+         \"stopExtendedInteractions\" -> {}
+         \"clickOnFeature\" -> {\"stopExtendedInteractions\"}
+         \"getUniqueIds\" -> {}
+         \"clickAnywhere\" -> {\"stopExtendedInteractions\"}
+         \"onStop\" -> {}
+         \"onMouseUp\" -> {\"fireUpdate\" \"stopExtendedInteractions\" \"getUniqueIds\"}
+         \"onCombineFeatures\" -> {\"fireActionable\"}
+         \"whileBoxSelect\" -> {}
+         \"onTrash\" -> {\"fireActionable\"}
+         \"onTouchStart\" -> {\"startOnActiveFeature\"}
+         \"onUncombineFeatures\" -> {\"fireActionable\"}")
+       (with-out-str
+         (-> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
+              {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
+             from-file-list-no-path
+             print))))
+  (is (= (clear-whitespaces
+           "\"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>whileBoxSelect\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onTrash\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onStop\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onSetup\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickAnywhere\" -> {\"stopExtendedInteractions\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>fireUpdate\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onKeyUp\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onCombineFeatures\" -> {\"fireActionable\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTrash\" -> {\"fireActionable\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTouchStart\" -> {\"startOnActiveFeature\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>startBoxSelect\" -> {\"stopExtendedInteractions\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onUncombineFeatures\" -> {\"fireActionable\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onTap\" -> {\"clickOnVertex\" \"clickAnywhere\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onSetup\" -> {\"fireActionable\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>toDisplayFeatures\" -> {\"fireActionable\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseUp\" -> {\"fireUpdate\" \"stopExtendedInteractions\" \"getUniqueIds\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>stopExtendedInteractions\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>dragMove\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>clickAnywhere\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>startOnActiveFeature\" -> {\"stopExtendedInteractions\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickOnFeature\" -> {\"stopExtendedInteractions\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickOnVertex\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onDrag\" -> {\"dragMove\" \"whileBoxSelect\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>getUniqueIds\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTap\" -> {\"clickOnVertex\" \"clickOnFeature\" \"clickAnywhere\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseMove\" -> {\"stopExtendedInteractions\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>fireActionable\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>toDisplayFeatures\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseDown\" -> {\"startOnActiveFeature\" \"startBoxSelect\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onMouseMove\" -> {}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseOut\" -> {\"fireUpdate\"}
+           \"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>clickOnVertex\" -> {}")
+       (with-out-str
+         (-> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
+              {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
+             from-file-list-with-path
+             print))))
+  (is (= {"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>whileBoxSelect"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onTrash"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onStop"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onSetup"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickAnywhere"
+          #{"stopExtendedInteractions"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>fireUpdate"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onKeyUp"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onCombineFeatures"
+          #{"fireActionable"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTrash"
+          #{"fireActionable"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTouchStart"
+          #{"startOnActiveFeature"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>startBoxSelect"
+          #{"stopExtendedInteractions"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onUncombineFeatures"
+          #{"fireActionable"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onTap"
+          #{"clickOnVertex" "clickAnywhere"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onSetup"
+          #{"fireActionable"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>toDisplayFeatures"
+          #{"fireActionable"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseUp"
+          #{"fireUpdate" "stopExtendedInteractions" "getUniqueIds"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>stopExtendedInteractions"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>dragMove"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>clickAnywhere"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>startOnActiveFeature"
+          #{"stopExtendedInteractions"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickOnFeature"
+          #{"stopExtendedInteractions"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickOnVertex"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onDrag"
+          #{"dragMove" "whileBoxSelect"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>getUniqueIds"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTap"
+          #{"clickOnVertex" "clickOnFeature" "clickAnywhere"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseMove"
+          #{"stopExtendedInteractions"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>fireActionable"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>toDisplayFeatures"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseDown"
+          #{"startOnActiveFeature" "startBoxSelect"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onMouseMove"
+          #{},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseOut"
+          #{"fireUpdate"},
+          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>clickOnVertex"
+          #{}}
+         (->> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
+               {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
+              (file-list->graph))))
+  (is (= {"/draw_polygon.js<>onStop" #{},
+          "/simple_select.js<>onStop" #{},
+          "onTouchStart" #{"startOnActiveFeature"}}
+         (clean-file-path {"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
+                           #{},
+                           "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onStop"
+                           #{},
+                           "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTouchStart"
+                           #{"startOnActiveFeature"}})
+         ))
+  )
+
+
