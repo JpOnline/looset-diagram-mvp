@@ -24,12 +24,13 @@
 
 (defn code-block-to-dot-syntax [[identifier references]]
   (let [sq #(str "\""%"\"")]
-    (str (sq identifier)" -> {"(clojure.string/join " " (map sq references))"}")))
+    (str (sq identifier) (when (not (empty? references))
+                           (str " -> {"(clojure.string/join "; " (map sq references)) "}")))))
 
 (defn graph->dot-syntax [graph]
   (->> graph
        (map code-block-to-dot-syntax)
-       (clojure.string/join "\n")))
+       (clojure.string/join ";\n")))
 
 (defn clean-file-path [graph]
   (let [del-less (comp clojure.string/reverse #(re-find #"^[^/]*" %) clojure.string/reverse)
@@ -96,3 +97,13 @@
              ;; graph->dot-syntax
              ;; print
              ))))
+
+(deftest graph->dot-syntax-test
+  (is (= "\"ca\" -> {\"cc\"};\n\"cb\" -> {\"cc\"};\n\"cc\""
+         (-> {"ca" #{"cc"}
+              "cb" #{"cc"}
+              "cc" #{}}
+            (graph->dot-syntax)
+            )
+        ))
+  )

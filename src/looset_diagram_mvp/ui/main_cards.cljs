@@ -6,8 +6,8 @@
 
     [day8.re-frame.tracing :refer-macros [fn-traced defn-traced]]
     [devcards.core :as devcards :refer-macros [defcard deftest defcard-rg]]
+    [looset-diagram-mvp.graph-ops :as graph-ops]
     [looset-diagram-mvp.ui.util :as util]
-    [looset-diagram-mvp.graph-ops]
     [re-frame.core :as re-frame]
     [reagent.core :as reagent]
 
@@ -89,13 +89,32 @@
           {:hidden @hidden?}
           (map-indexed #(with-meta %2 {:key %1}) children)]]]])))
 
+(defn draw-graph [id]
+  (fn []
+    (let [dot-string (str "looset_diagram {" (graph-ops/graph->dot-syntax {"ca" #{"cc"} "cb" #{"cc"} "cc" #{}}) "}")
+          parsed-data (-> js/vis (.parseDOTNetwork dot-string))
+          container (-> js/document (.getElementById "mynetwork"))
+          data #js {:nodes (.-nodes parsed-data) :edges (.-edges parsed-data)}
+          options #js {}]
+      (-> js/vis .-Network (new container data options)))))
+
 (defn visjs-component []
-  [:h1 "Visjs comp3"]
-  )
+  [(util/with-mount-fn
+     [:div
+      {:id "mynetwork"
+       :style #js {:height "400px" :width "600px" :border "1px solid lightgray"}
+       :component-did-mount (draw-graph "mynetwork")}
+      [:p "Loading.."]])])
 
 (defcard-rg visjs-card
   (card-component
     [visjs-component])
+  {:hidden? (reagent/atom false)})
+
+(defcard-rg dot-string-input-card
+  (card-component
+    [:input {:onBlur #(js/console.log (-> % .-target .-value))}]
+    )
   {:hidden? (reagent/atom false)})
 
 (deftest foo-test
