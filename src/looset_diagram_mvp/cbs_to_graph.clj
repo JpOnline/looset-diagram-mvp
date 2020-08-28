@@ -42,10 +42,16 @@
                    (reduce1 merge-entry (or m1 {}) (seq m2)))]
       (reduce1 merge2 maps))))
 
+(defn path-last-part [path]
+  (if (re-find #"^.*<>" path)
+    (clojure.string/replace path #"^.*<>" "")
+    (->> path clojure.string/reverse (re-find #"^[^/]*") clojure.string/reverse)
+    ))
+
 (defn filter-cb-identifiers [code-blocks]
   (let [cb-identifiers (-> code-blocks
                            keys
-                           (->> (map #(clojure.string/replace % #"^.*<>" "")))
+                           (->> (map path-last-part))
                            set
                            (conj "DUPLICATED KEY!!"))]
     (apply merge (map (fn [[k v]] {k (set (filter cb-identifiers v))}) code-blocks))))
@@ -74,23 +80,35 @@
        (map :code-blocks)
        ;; (apply (partial merge-with (constantly #{"DUPLICATED KEY!!"}))) ;; Use merge-with-key-changer instead?
        (apply (partial merge-with clojure.set/union))
-       (filter-cb-identifiers))
-  )
+       (filter-cb-identifiers)))
 
-(defn graph->DOT-syntax [graph]
-  (let [my-fn (fn [val [k v]] (conj val {k v}))]
-    (reduce my-fn {} graph)
-    )
-  )
+(defn graph->dot-syntax [graph]
+  (->> graph
+       (map code-block-to-dot-syntax)
+       (clojure.string/join "\n")))
 
 (defn clean-file-path [graph]
-  (let [del-more #(clojure.string/replace % #"^.*<>" "")
+  (let [del-less (comp clojure.string/reverse #(re-find #"^[^/]*" %) clojure.string/reverse)
+        del-more #(if (re-find #"^.*<>" %) (clojure.string/replace % #"^.*<>" "") (del-less %))
         freqs (frequencies (map del-more (keys graph)))
-        del-less (comp clojure.string/reverse #(re-find #"^[^>]*><[^/]*/" %) clojure.string/reverse)
         clean (fn [val [k v]] (if (> (freqs (del-more k)) 1)
                                 (conj val {(del-less k) v})
                                 (conj val {(del-more k) v})))]
     (reduce clean {} graph)))
+
+(defn close-graph [graph path-to-close]
+  (let [origins-to-replace (filter #(clojure.string/starts-with? (first %) path-to-close) graph)
+        dests-to-replace (set (map path-last-part (keys origins-to-replace)))
+        unified-dest (->> origins-to-replace vals (apply clojure.set/union))
+        dest-replacer (fn [[k v]] (if (empty? (clojure.set/intersection dests-to-replace v))
+                                    {k v}
+                                    {k (set (conj (remove dests-to-replace v) (path-last-part path-to-close)))}))]
+    (->> graph
+         (remove (set origins-to-replace))
+         (map dest-replacer)
+         (apply merge)
+         (#(conj % {path-to-close unified-dest}))
+         filter-cb-identifiers)))
 
 (defn clear-whitespaces
   "Deletes whitespaces after a new line character (\n)
@@ -105,19 +123,21 @@
   (-> {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"}
     (file-info-with-code-blocks)
     :code-blocks)
-  (->> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
+  (-> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
         {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
        (file-list->graph)
-       ;; graph->DOT-syntax
-       (#(with-out-str (pprint %)))
-       (spit "tmp.txt")
+       (close-graph "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js")
+       (close-graph "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js")
+       clean-file-path
+       graph->dot-syntax
+       ;; (#(with-out-str (pprint %)))
+       (->> (spit "tmp.txt"))
        )
   (-> "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
       clojure.string/reverse
       (->> (re-find #"^[^>]*><[^/]*/"))
       clojure.string/reverse
       )
-
   )
 
 (deftest from-file-list-test
@@ -261,16 +281,46 @@
          (->> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
                {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
               (file-list->graph))))
-  (is (= {"/draw_polygon.js<>onStop" #{},
-          "/simple_select.js<>onStop" #{},
+  (is (= {"draw_polygon.js<>onStop" #{},
+          "simple_select.js<>onStop" #{},
           "onTouchStart" #{"startOnActiveFeature"}}
          (clean-file-path {"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
                            #{},
                            "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onStop"
                            #{},
                            "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTouchStart"
+                           #{"startOnActiveFeature"}})))
+  (is (= {"onStop" #{},
+          "simple_select.js" #{"startOnActiveFeature"},
+          }
+         (clean-file-path {"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
+                           #{},
+                           "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js"
                            #{"startOnActiveFeature"}})
-         ))
-  )
+         )))
 
-
+(deftest close-graph-test
+  (is (= {"/src/fa.js" #{"cc"}
+          "/src/fb.js<>cc" #{}}
+         (-> {"/src/fa.js<>ca" #{"cc"}
+              "/src/fa.js<>cb" #{"cc"}
+              "/src/fb.js<>cc" #{}}
+             (close-graph "/src/fa.js"))))
+  (is (= {"/src/fa.js" #{"cc"}
+          "/src/fb.js<>cc" #{}}
+         (-> {"/src/fa.js<>ca" #{"cc"}
+              "/src/fa.js<>cb" #{"cc"}
+              "/src/fa.js<>cd" #{"cb"}
+              "/src/fb.js<>cc" #{}}
+             (close-graph "/src/fa.js"))))
+  (is (= {"/src/fa.js" #{"cc"}
+          "/src/fb.js<>cc" #{"fa.js"}}
+         (-> {"/src/fa.js<>ca" #{"cc"}
+              "/src/fa.js<>cb" #{"cc"}
+              "/src/fa.js<>cd" #{"cb"}
+              "/src/fb.js<>cc" #{"cb"}}
+             (close-graph "/src/fa.js")
+             ;; clean-file-path
+             ;; graph->dot-syntax
+             ;; print
+             ))))
