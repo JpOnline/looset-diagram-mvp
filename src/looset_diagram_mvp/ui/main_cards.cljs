@@ -8,6 +8,8 @@
     [devcards.core :as devcards :refer-macros [defcard deftest defcard-rg]]
     [looset-diagram-mvp.graph-ops :as graph-ops]
     [looset-diagram-mvp.ui.util :as util :refer [<sub >evt]]
+    [menu-item :as material-menu-item]
+    [menu-list :as material-menu-list]
     [re-frame.core :as re-frame]
     [reagent.core :as reagent]
 
@@ -89,29 +91,78 @@
           {:hidden @hidden?}
           (map-indexed #(with-meta %2 {:key %1}) children)]]]])))
 
-(defn draw-graph [id graph]
+(defn graph->dir-structure
+  [app-state]
+  (let [dirs-to-close (->> (get-in app-state [:ui :closed-dirs])
+                           (filter (comp true? val))
+                           (map first)
+                           (sort-by (juxt count identity))
+                           reverse)
+        graph (-> app-state
+                  (get-in [:domain :graph] {"No graph set" #{}})
+                  (as-> g (reduce graph-ops/close-graph g dirs-to-close)))
+        paths (-> graph keys sort)
+        splited (map #(clojure.string/split % #"/|(?=<>)") paths)
+        to-dir-structure (fn to-dir-structure [val [label & rest]]
+                           (if label
+                             (update val label #(to-dir-structure % rest))
+                             {}))]
+    (reduce to-dir-structure {} splited)
+    ))
+(re-frame/reg-sub ::graph->dir-structure graph->dir-structure)
+
+(defn directory-structure-component []
+  (let [dir-structure->menu
+        (fn s->mi
+          ([structure]
+           (s->mi structure 0 ""))
+          ([[label sub-menus] padding on-click]
+           (cons ^{:key (str on-click "/" label)}
+                 [:> material-menu-item
+                  {:onClick #(>evt [::toggle-dir-openness (subs (str on-click "/" label) 1)])
+                   :style {:paddingLeft (+ 10 (* 12 padding))}}
+                  label]
+                 (mapcat s->mi sub-menus (repeat (inc padding)) (repeat (str on-click "/" label))))))]
+    [:> material-menu-list
+     (map dir-structure->menu (<sub [::graph->dir-structure]))
+     ])
+  )
+
+(defcard-rg directory-structure-card
+  (card-component
+    [directory-structure-component])
+  {:hidden? (reagent/atom false)})
+
+
+(defn draw-graph [id dot-string]
   (fn []
-    (let [dot-string (str "looset_diagram {" graph "}")
-          parsed-data (-> js/vis (.parseDOTNetwork dot-string))
+    (let [parsed-data (-> js/vis (.parseDOTNetwork dot-string))
           container (-> js/document (.getElementById id))
           data #js {:nodes (.-nodes parsed-data) :edges (.-edges parsed-data)}
           options #js {}]
       (-> js/vis .-Network (new container data options)))))
 
-(defn graph
+(defn graph-dot-string
   [app-state]
-  (-> app-state
+  (let [dirs-to-close (->> (get-in app-state [:ui :closed-dirs])
+                           (filter (comp true? val))
+                           (map first)
+                           (sort-by (juxt count identity))
+                           reverse)]
+    (-> app-state
       (get-in [:domain :graph] {"No graph set" #{}})
+      (as-> g (reduce graph-ops/close-graph g dirs-to-close))
       graph-ops/clean-file-path
-      graph-ops/graph->dot-syntax))
-(re-frame/reg-sub ::graph graph)
+      graph-ops/graph->dot-syntax
+      (as-> dot (str "looset_diagram {" dot "}")))))
+(re-frame/reg-sub ::graph-dot-string graph-dot-string)
 
 (defn visjs-component []
   [(util/with-mount-fn
      [:div
       {:id "looset-diagram"
        :style #js {:height "400px" :width "600px" :border "1px solid lightgray"}
-       :component-did-mount (draw-graph "looset-diagram" (<sub [::graph]))}
+       :component-did-mount (draw-graph "looset-diagram" (<sub [::graph-dot-string]))}
       [:p "Loading.."]])])
 
 (defcard-rg visjs-card
@@ -126,8 +177,7 @@
 
 (defn-traced toggle-dir-openness
   [app-state [event file-path]]
-  ;; (assoc-in app-state [:domain :graph] (cljs.reader/read-string new-graph))
-  )
+  (update-in app-state [:ui :closed-dirs file-path] not))
 (re-frame/reg-event-db ::toggle-dir-openness toggle-dir-openness)
 
 (defcard-rg dot-string-input-card
@@ -136,6 +186,8 @@
      [:input {:onBlur #(>evt [::graph-updated (-> % .-target .-value)])}]
      [:button {:onClick #(>evt [::toggle-dir-openness "test/source-code-examples/draw_polygon.js"])}
       "Toggle draw_polygon.js"]
+     [:button {:onClick #(>evt [::toggle-dir-openness "test/source-code-examples/simple_select.js"])}
+      "Toggle simple_select.js"]
      ]
     )
   {:hidden? (reagent/atom false)})

@@ -51,7 +51,7 @@
     (->> graph
          (remove (set origins-to-replace))
          (map dest-replacer)
-         (apply merge)
+         (apply merge {})
          (#(conj % {path-to-close unified-dest}))
          filter-cb-identifiers)))
 
@@ -93,10 +93,22 @@
               "/src/fa.js<>cd" #{"cb"}
               "/src/fb.js<>cc" #{"cb"}}
              (close-graph "/src/fa.js")
-             ;; clean-file-path
-             ;; graph->dot-syntax
-             ;; print
-             ))))
+             )))
+  (is (= {"/src" #{}}
+         (-> {"/src/fa.js" #{"cc"}
+              "/src/fb.js<>cc" #{"fa.js"}}
+             (close-graph "/src")
+             )
+         ))
+  (is (= {"/src" #{}}
+         (-> {"/src/fa.js<>ca" #{"cc"}
+              "/src/fa.js<>cb" #{"cc"}
+              "/src/fa.js<>cd" #{"cb"}
+              "/src/fb.js<>cc" #{"cb"}}
+             (close-graph "/src")
+             )
+         ))
+  )
 
 (deftest graph->dot-syntax-test
   (is (= "\"ca\" -> {\"cc\"};\n\"cb\" -> {\"cc\"};\n\"cc\""
