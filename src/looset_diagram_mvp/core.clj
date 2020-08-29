@@ -1,11 +1,15 @@
 (ns looset-diagram-mvp.core
   (:require
     [clojure.set]
-    [looset-diagram-mvp.util :as util]
 
     [clojure.test :refer :all]
     [clojure.pprint :refer [pprint]]
     ))
+
+(defn get-pred
+  "Returns the first element of coll that satisfy the predicate f."
+  [f coll]
+  (some #(if (f %) %) coll))
 
 (def token-finite-automata
   {:first-char [{:regex #"[0-9]" :next-state :number}
@@ -65,7 +69,7 @@
 (defn lexical-analyzer [{:keys [state] :as big-state} code-to-process]
   (let [char (first code-to-process)
         transitions (state token-finite-automata)
-        {:keys [next-state]} (util/get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)
+        {:keys [next-state]} (get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)
         {:keys [next-state] :as big-state} (-> big-state
                                                (assoc :next-char char)
                                                (assoc :next-state next-state)
@@ -108,7 +112,7 @@
   (let [code-to-process (concat code-to-process (seq "\nEOF"))
         char (first code-to-process)
         transitions (:first-char token-finite-automata)
-        {:keys [next-state]} (util/get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)]
+        {:keys [next-state]} (get-pred (fn [{:keys [regex]}] (re-find regex (str char))) transitions)]
     (lexical-analyzer
       {:position [1 2]
        :char (first code-to-process)

@@ -1,6 +1,5 @@
 (ns looset-diagram-mvp.code-blocks
   (:require
-    [looset-diagram-mvp.util :as util]
     [looset-diagram-mvp.core :as lexical-analyzer]
 
     [clojure.test :refer :all]
