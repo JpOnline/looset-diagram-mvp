@@ -1,0 +1,12 @@
+{
+  "name": "Looset Diagram MVP",
+  "start_url": "/looset/",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "images/looset-logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
