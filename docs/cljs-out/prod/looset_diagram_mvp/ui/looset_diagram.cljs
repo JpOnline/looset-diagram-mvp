@@ -109,6 +109,21 @@
        :component-did-mount (draw-graph "looset-diagram" (<sub [::graph-dot-string]) (<sub [::graph-options]))}
       [:p "Loading.."]])])
 
+(defn project-link-text
+  [app-state]
+  (get-in app-state [:ui :project-link :text]))
+(re-frame/reg-sub ::project-link-text project-link-text)
+
+(defn project-link-href
+  [app-state]
+  (get-in app-state [:ui :project-link :href]))
+(re-frame/reg-sub ::project-link-href project-link-href)
+
+(defn html-on-top-of-label-panel
+  [app-state]
+  (get-in app-state [:ui :html-on-top-of-label-panel]))
+(re-frame/reg-sub ::html-on-top-of-label-panel html-on-top-of-label-panel)
+
 (defn view []
   [:<>
    [:style
@@ -126,11 +141,12 @@
      {:style {:flexGrow 1
               :overflow "auto"
               :borderLeft "1px solid gray"}}
-      [:a.quattrocento
+     [:div {:dangerouslySetInnerHTML #js {:__html (<sub [::html-on-top-of-label-panel])}}]
+     [:a.quattrocento
        {:style {:marginLeft "10px"
                 :textDecoration "none"}
-        :href "https://github.com/mapbox/mapbox-gl-draw/tree/897a8a8cb9d035ef1e8ec1f11de6766df89db76d/src"}
-       "See mapbox-gl-draw on Github"]
+        :href (<sub [::project-link-href])}
+       (<sub [::project-link-text])]
      [:h2.quattrocento {:style {:margin "21px 0 4px 0"
                                 :color "darkgray"
                                 :textAlign "center"}}
