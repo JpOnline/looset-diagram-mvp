@@ -7,6 +7,10 @@ window["ReactDOM"] = ReactDOM;
 window["cljsjs.react"] = React;
 window["cljsjs.react-dom"] = ReactDOM;
 
+import * as firebase from 'firebase/app';
+import 'firebase/database';
+window["firebase"] = firebase;
+
 // See list of available icons in https://material.io/resources/icons/
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import ExpandLessIcon from '@material-ui/icons/ExpandLess';
