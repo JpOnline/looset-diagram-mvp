@@ -63,97 +63,93 @@
        (filter-cb-identifiers)))
 
 (comment
-  (:file-path (file-info-with-code-blocks {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"}))
-  (file-code-blocks-with-file-path {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"})
-  (file-info-with-code-blocks {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"})
-  (-> {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js"}
-    (file-info-with-code-blocks)
-    :code-blocks)
-  (-> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
-        {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
+  (-> [
+       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/Articulate/UrlHelperExtensions.cs"}
+       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/Articulate.Web/App_Code/TestControllers.cs"}
+       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/Articulate.Web/Properties/AssemblyInfo.cs"}
+       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/SolutionInfo.cs"}
+       ]
        (file-list->graph)
-       ;; (close-graph "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js")
-       ;; (close-graph "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js")
-       ;; clean-file-path
-       ;; graph->dot-syntax
-       ;; (#(with-out-str (pprint %)))
+       (->> (assoc-in {} [:domain :graph]))
+       (assoc-in [:ui :closed-dirs] {
+                                     "src/Articulate.Web/App_Plugins/Articulate/BackOffice/ArticulateThemes/delete.controller.js" true
+                                     "src/Articulate.Web/config/grid.editors.config.js" true
+                                     "src/Articulate.Web/media" true
+                                     "src" true
+                                     })
+       (assoc-in [:ui :project-link :text] "See mapbox-gl-draw on Github")
+       (assoc-in [:ui :project-link :href] "https://github.com/mapbox/mapbox-gl-draw/tree/897a8a8cb9d035ef1e8ec1f11de6766df89db76d/src")
        (->> (spit "tmp.txt"))
        )
-  (-> "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
-      clojure.string/reverse
-      (->> (re-find #"^[^>]*><[^/]*/"))
-      clojure.string/reverse
-      )
   )
 
 (deftest from-file-list-test
-  (is (= {"/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onStop"
+  (is (= {"test/source-code-examples/draw_polygon.js<>onStop"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>whileBoxSelect"
+          "test/source-code-examples/simple_select.js<>whileBoxSelect"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onTrash"
+          "test/source-code-examples/draw_polygon.js<>onTrash"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onStop"
+          "test/source-code-examples/simple_select.js<>onStop"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onSetup"
+          "test/source-code-examples/draw_polygon.js<>onSetup"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickAnywhere"
+          "test/source-code-examples/simple_select.js<>clickAnywhere"
           #{"stopExtendedInteractions"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>fireUpdate"
+          "test/source-code-examples/simple_select.js<>fireUpdate"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onKeyUp"
+          "test/source-code-examples/draw_polygon.js<>onKeyUp"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onCombineFeatures"
+          "test/source-code-examples/simple_select.js<>onCombineFeatures"
           #{"fireActionable"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTrash"
+          "test/source-code-examples/simple_select.js<>onTrash"
           #{"fireActionable"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTouchStart"
+          "test/source-code-examples/simple_select.js<>onTouchStart"
           #{"startOnActiveFeature"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>startBoxSelect"
+          "test/source-code-examples/simple_select.js<>startBoxSelect"
           #{"stopExtendedInteractions"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onUncombineFeatures"
+          "test/source-code-examples/simple_select.js<>onUncombineFeatures"
           #{"fireActionable"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onTap"
+          "test/source-code-examples/draw_polygon.js<>onTap"
           #{"clickOnVertex" "clickAnywhere"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onSetup"
+          "test/source-code-examples/simple_select.js<>onSetup"
           #{"fireActionable"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>toDisplayFeatures"
+          "test/source-code-examples/simple_select.js<>toDisplayFeatures"
           #{"fireActionable"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseUp"
+          "test/source-code-examples/simple_select.js<>onMouseUp"
           #{"fireUpdate" "stopExtendedInteractions" "getUniqueIds"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>stopExtendedInteractions"
+          "test/source-code-examples/simple_select.js<>stopExtendedInteractions"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>dragMove"
+          "test/source-code-examples/simple_select.js<>dragMove"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>clickAnywhere"
+          "test/source-code-examples/draw_polygon.js<>clickAnywhere"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>startOnActiveFeature"
+          "test/source-code-examples/simple_select.js<>startOnActiveFeature"
           #{"stopExtendedInteractions"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickOnFeature"
+          "test/source-code-examples/simple_select.js<>clickOnFeature"
           #{"stopExtendedInteractions"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>clickOnVertex"
+          "test/source-code-examples/simple_select.js<>clickOnVertex"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onDrag"
+          "test/source-code-examples/simple_select.js<>onDrag"
           #{"dragMove" "whileBoxSelect"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>getUniqueIds"
+          "test/source-code-examples/simple_select.js<>getUniqueIds"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onTap"
+          "test/source-code-examples/simple_select.js<>onTap"
           #{"clickOnVertex" "clickOnFeature" "clickAnywhere"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseMove"
+          "test/source-code-examples/simple_select.js<>onMouseMove"
           #{"stopExtendedInteractions"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>fireActionable"
+          "test/source-code-examples/simple_select.js<>fireActionable"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>toDisplayFeatures"
+          "test/source-code-examples/draw_polygon.js<>toDisplayFeatures"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseDown"
+          "test/source-code-examples/simple_select.js<>onMouseDown"
           #{"startOnActiveFeature" "startBoxSelect"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>onMouseMove"
+          "test/source-code-examples/draw_polygon.js<>onMouseMove"
           #{},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js<>onMouseOut"
+          "test/source-code-examples/simple_select.js<>onMouseOut"
           #{"fireUpdate"},
-          "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js<>clickOnVertex"
+          "test/source-code-examples/draw_polygon.js<>clickOnVertex"
           #{}}
-         (->> [{:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/draw_polygon.js" }
-               {:indentation-level-to-search 0 :file-path "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js" }]
+         (->> [{:indentation-level-to-search 0 :file-path "test/source-code-examples/draw_polygon.js" }
+               {:indentation-level-to-search 0 :file-path "test/source-code-examples/simple_select.js" }]
               (file-list->graph)))))
-
