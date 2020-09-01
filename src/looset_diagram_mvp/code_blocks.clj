@@ -37,6 +37,9 @@
                 $
                 (update $ :errors conj {:duplicated-code-block cb-line-id})))))))
 
+;; Order
+;; center, right, left
+;; word, new-line, space, symbol, number
 (defn process-token [{:keys [state token] :as big-state}]
   (cond
     (and (= :initial-state state)
@@ -47,7 +50,6 @@
         (update-cb-line-id token))
 
     (and (= :initial-state state)
-         (#{:center :left :right} (indentation-position big-state))
          (#{:line-comment :new-line} (token :category)))
     (-> big-state
         (assoc :indentation-level 0))
@@ -59,20 +61,38 @@
 
     (and (= :initial-state state)
          (= :center (indentation-position big-state))
-         (#{:number symbol} (token :category)))
+         (#{:number :symbol} (token :category)))
     (assoc big-state :state :cb-first-line)
+
+    (and (= :initial-state state)
+         (#{:right} (indentation-position big-state))
+         (#{:word :space :symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :ignore-line))
+
+    (and (= :initial-state state)
+         (#{:right} (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0))
+
+    (and (= :initial-state state)
+         (#{:left} (indentation-position big-state))
+         (#{:word :symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :ignore-line))
+
+    (and (= :initial-state state)
+         (#{:left} (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0))
 
     (and (= :initial-state state)
          (#{:left} (indentation-position big-state))
          (#{:space} (token :category)))
     (-> big-state
         (update :indentation-level inc))
-
-    (and (= :initial-state state)
-         (#{:left} (indentation-position big-state))
-         (#{:number :symbol :word} (token :category)))
-    (-> big-state
-        (assoc :state :ignore-line))
 
     (and (= :cb-first-line state)
          (= :word (token :category)))
@@ -97,38 +117,6 @@
         (update-cb-line-id token))
 
     (and (= :cb-second-line state)
-         (#{:center} (indentation-position big-state))
-         (#{:symbol :number} (token :category)))
-    (-> big-state
-        (assoc :state :cb-first-line)
-        (update-cb-line-id token))
-
-    (and (= :cb-second-line state)
-         (#{:right} (indentation-position big-state))
-         (= :word (token :category)))
-    (-> big-state
-        (assoc :state :inside-cb)
-        (update-words-in-cb token))
-
-    (and (= :cb-second-line state)
-         (#{:left} (indentation-position big-state))
-         (= :word (token :category)))
-    (-> big-state
-        (assoc :state :ignore-line))
-
-    (and (= :cb-second-line state)
-         (#{:left} (indentation-position big-state))
-         (#{:number :symbol :word} (token :category)))
-    (-> big-state
-        (assoc :state :ignore-line))
-
-    (and (= :cb-second-line state)
-         (#{:left} (indentation-position big-state))
-         (#{:space} (token :category)))
-    (-> big-state
-        (update :indentation-level inc))
-
-    (and (= :cb-second-line state)
          (#{:line-comment :new-line} (token :category)))
     (-> big-state
         (assoc :indentation-level 0)
@@ -140,6 +128,45 @@
     (-> big-state
         (update :indentation-level inc))
 
+    (and (= :cb-second-line state)
+         (#{:center} (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :cb-first-line))
+
+    (and (= :cb-second-line state)
+         (#{:right} (indentation-position big-state))
+         (= :word (token :category)))
+    (-> big-state
+        (assoc :state :inside-cb)
+        (update-words-in-cb token))
+
+    (and (= :cb-second-line state)
+         (#{:right} (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :inside-cb))
+
+    (and (= :cb-second-line state)
+         (#{:left} (indentation-position big-state))
+         (#{:word :symbol :number} (token :category)))
+    (-> big-state
+        (dissoc :cb-line-id)
+        (assoc :state :ignore-line))
+
+    (and (= :cb-second-line state)
+         (#{:left} (indentation-position big-state))
+         (#{:space} (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :cb-second-line state)
+         (#{:left} (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (dissoc :cb-line-id)
+        (assoc :state :ignore-line))
+
     (and (= :cb-second-line-with-blank-line state)
          (= :center (indentation-position big-state))
          (= :word (token :category)))
@@ -150,9 +177,22 @@
 
     (and (= :cb-second-line-with-blank-line state)
          (= :center (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :center (indentation-position big-state))
          (= :space (token :category)))
     (-> big-state
         (update :indentation-level inc))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :center (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :cb-first-line)
+        (dissoc :cb-line-id))
 
     (and (= :cb-second-line-with-blank-line state)
          (= :right (indentation-position big-state))
@@ -174,17 +214,28 @@
         (update :indentation-level inc))
 
     (and (= :cb-second-line-with-blank-line state)
+         (= :right (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :inside-cb))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (#{:left} (indentation-position big-state))
+         (#{:word :symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :ignore-line))
+
+    (and (= :cb-second-line-with-blank-line state)
+         (= :left (indentation-position big-state))
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0))
+
+    (and (= :cb-second-line-with-blank-line state)
          (#{:left} (indentation-position big-state))
          (#{:space} (token :category)))
     (-> big-state
         (update :indentation-level inc))
-
-    (and (= :inside-cb state)
-         (#{:center :left} (indentation-position big-state))
-         (#{:word :symbol :number} (token :category)))
-    (-> big-state
-        (assoc :state :initial-state)
-        (update-words-in-cb token))
 
     (and (= :inside-cb state)
          (= :word (token :category)))
@@ -202,10 +253,28 @@
     big-state
 
     (and (= :inside-cb-new-line state)
-         (#{:center :left} (indentation-position big-state))
-         (#{:word :symbol :number} (token :category)))
+         (#{:center} (indentation-position big-state))
+         (#{:word} (token :category)))
     (-> big-state
-        (assoc :state :cb-last-line)
+        (assoc :state :cb-first-line)
+        (update-cb-line-id token)
+        (record-code-block))
+
+    (and (= :inside-cb-new-line state)
+         (#{:line-comment :new-line} (token :category)))
+    (-> big-state
+        (assoc :indentation-level 0))
+
+    (and (= :inside-cb-new-line state)
+         (#{:space} (token :category)))
+    (-> big-state
+        (update :indentation-level inc))
+
+    (and (= :inside-cb-new-line state)
+         (#{:center} (indentation-position big-state))
+         (#{:symbol :number} (token :category)))
+    (-> big-state
+        (assoc :state :cb-first-line)
         (record-code-block))
 
     (and (= :inside-cb-new-line state)
@@ -219,39 +288,23 @@
          (#{:right} (indentation-position big-state))
          (#{:symbol :number} (token :category)))
     (-> big-state
-        (assoc :state :inside-cb)
-        (update-words-in-cb token))
+        (assoc :state :inside-cb))
 
     (and (= :inside-cb-new-line state)
-         (#{:space} (token :category)))
+         (#{:left} (indentation-position big-state))
+         (#{:word :symbol :number} (token :category)))
     (-> big-state
-        (update :indentation-level inc))
-
-    (and (= :inside-cb-new-line state)
-         (#{:center :left :right} (indentation-position big-state))
-         (#{:line-comment :new-line} (token :category)))
-    (-> big-state
-        (assoc :indentation-level 0))
+        (assoc :state :ignore-line)
+        (record-code-block))
 
     (and (= :ignore-line state)
-         (#{:center :left :right} (indentation-position big-state))
          (#{:line-comment :new-line} (token :category)))
     (-> big-state
         (assoc :state :initial-state)
         (assoc :indentation-level 0))
 
     (and (= :ignore-line state)
-         (#{:center :left :right} (indentation-position big-state))
-         (#{:number :symbol :space :word} (token :category)))
-    big-state
-
-    (and (= :cb-last-line state)
-         (#{:line-comment :new-line} (token :category)))
-    (-> big-state
-        (assoc :state :initial-state)
-        (assoc :indentation-level 0))
-
-    (and (= :cb-last-line state))
+         (#{:word :space :symbol :number} (token :category)))
     big-state
 
     :else
@@ -278,12 +331,14 @@
   (process-token {:state :cb-first-line :indentation-level-to-search 0 :indentation-level 2 :token {:token "\n", :category :new-line, :position [141 27]} :cb-line-id "export"})
   (pprint (identifier {:token-list {:token "isEqual", :category :word, :position  [1 8]}}
                                   {:token "const", :category :word, :position [7 31]}))
-   (-> (slurp "/home/smokeonline/projects/mapbox-gl-draw/src/modes/draw_polygon.js")
+   (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/src/looset_diagram_mvp/core.clj")
        lexical-analyzer/generate-token-list
        (select-keys [:token-list :token-occurrencies])
        identifier
-       reverse
-       (nth 3)
+       ;; reverse
+       last
+       ;; (->> (take 550))
+       ;; (->> (drop 540))
        ;; :code-blocks
        ;; keys
        pprint
@@ -334,7 +389,7 @@
              last
              :code-blocks)))
   (is (= ["featureTypes" "export"]
-         (-> (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
+         (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/api.js")
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
              identifier
@@ -342,7 +397,7 @@
              :code-blocks
              keys)))
   (is (= #{"getFeatureIdsAt" "getSelectedIds" "getSelected" "getSelectedPoints" "set" "add" "get" "getAll" "delete" "deleteAll" "changeMode" "getMode" "trash" "combineFeatures" "uncombineFeatures" "setFeatureProperty"}
-         (-> (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")
+         (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/api.js")
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
              (merge {:indentation-level-to-search 2})
@@ -352,7 +407,7 @@
              keys
              set)))
   (is (= #{"onSetup" "fireUpdate" "fireActionable" "getUniqueIds" "stopExtendedInteractions" "onStop" "onMouseMove" "onMouseOut" "onTap" "clickAnywhere" "clickOnVertex" "startOnActiveFeature" "clickOnFeature" "onMouseDown" "startBoxSelect" "onTouchStart" "onDrag" "whileBoxSelect" "dragMove" "onMouseUp" "toDisplayFeatures" "onTrash" "onCombineFeatures" "onUncombineFeatures"}
-         (-> (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/simple_select.js")
+         (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/simple_select.js")
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
              (merge {:indentation-level-to-search 0})
@@ -362,4 +417,22 @@
              keys
              set
              )))
+  (is (= "EOF"
+         (-> (slurp "/home/smokeonline/projects/looset/projects-example/compose/compose/parallel.py")
+             lexical-analyzer/generate-token-list
+             (select-keys [:token-list :token-occurrencies])
+             (merge {:indentation-level-to-search 0})
+             identifier
+             last
+             :token
+             :token)))
+  (is (= "EOF"
+         (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/src/looset_diagram_mvp/core.clj")
+             lexical-analyzer/generate-token-list
+             (select-keys [:token-list :token-occurrencies])
+             (merge {:indentation-level-to-search 0})
+             identifier
+             last
+             :token
+             :token)))
   )

@@ -25,10 +25,7 @@
     (reagent.dom/render [looset-diagram/view] el)))
 
 (defn query-parameter [parameter]
-  (-> js/window .-location
-      .-search
-      (->> (new js/URLSearchParams))
-      (.get parameter)))
+  (-> js/window .-location .-search (->> (new js/URLSearchParams)) (.get parameter)))
 
 (defn init-state! [state]
   (re-frame/dispatch-sync [::set-app-state state])
