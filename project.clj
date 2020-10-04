@@ -5,6 +5,7 @@
                  [re-frame "0.12.0"]
                  [reagent "0.10.0"]]
   :repl-options {:init-ns looset-diagram-mvp.core}
+  :main looset-diagram-mvp.cbs-to-graph
 
   :source-paths ["src"]
 

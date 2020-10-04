@@ -62,24 +62,43 @@
        (apply (partial merge-with clojure.set/union))
        (filter-cb-identifiers)))
 
+(defn -main []
+  (let [files-to-analyze (read-string (slurp "interface-files/files-to-analyze.edn"))
+        files-path (mapv :file-path (read-string (slurp "interface-files/files-to-analyze.edn")))
+        closed-dirs (read-string (slurp "interface-files/closed-dirs.edn"))
+        closed-paths (-> (concat files-path closed-dirs)
+                           (zipmap (repeat true)))]
+    (-> files-to-analyze
+        (file-list->graph)
+        (->> (assoc-in {} [:domain :graph]))
+        (assoc-in [:ui :closed-dirs] closed-paths)
+        (->> (str "(ns looset-diagram-mvp.ui.initial-state)\n\n(def initial-state\n  "))
+        (str ")")
+        (->> (spit "src/looset_diagram_mvp/ui/initial_state.cljs"))
+        )))
+
 (comment
-  (-> [
-       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/Articulate/UrlHelperExtensions.cs"}
-       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/Articulate.Web/App_Code/TestControllers.cs"}
-       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/Articulate.Web/Properties/AssemblyInfo.cs"}
-       {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/Articulate/src/SolutionInfo.cs"}
-       ]
+  (read-string (slurp "/home/smokeonline/projects/looset/looset-diagram-mvp/tmp.txt"))
+  (zipmap ["x" "y"] (repeat true))
+  (spit "src/looset_diagram_mvp/ui/i.cljs" (str "(ns looset-diagram-mvp.ui.initial-state)\n\n(def initial-state\n  " {:t true} ")"))
+  (-> (slurp "/home/smokeonline/projects/looset/looset-diagram-mvp/closed-dirs.edn")
+      read-string
+      (zipmap (repeat true))
+      pprint
+      )
+  (-> (read-string (slurp "/home/smokeonline/projects/looset/looset-diagram-mvp/files-to-analyze.edn"))
        (file-list->graph)
        (->> (assoc-in {} [:domain :graph]))
+       ;; pprint
        (assoc-in [:ui :closed-dirs] {
                                      "src/Articulate.Web/App_Plugins/Articulate/BackOffice/ArticulateThemes/delete.controller.js" true
                                      "src/Articulate.Web/config/grid.editors.config.js" true
                                      "src/Articulate.Web/media" true
                                      "src" true
                                      })
-       (assoc-in [:ui :project-link :text] "See mapbox-gl-draw on Github")
-       (assoc-in [:ui :project-link :href] "https://github.com/mapbox/mapbox-gl-draw/tree/897a8a8cb9d035ef1e8ec1f11de6766df89db76d/src")
-       (->> (spit "tmp.txt"))
+       ;; (assoc-in [:ui :project-link :text] "See mapbox-gl-draw on Github")
+       ;; (assoc-in [:ui :project-link :href] "https://github.com/mapbox/mapbox-gl-draw/tree/897a8a8cb9d035ef1e8ec1f11de6766df89db76d/src")
+       ;; (->> (spit "tmp.txt"))
        )
   )
 
