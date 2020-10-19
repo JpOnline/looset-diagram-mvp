@@ -41,7 +41,7 @@
                                 (conj val {(del-more k) v})))]
     (reduce clean {} graph)))
 
-(defn close-graph [graph path-to-close]
+(defn close-graph-no-memo [graph path-to-close]
   (let [origins-to-replace (filter #(clojure.string/starts-with? (first %) path-to-close) graph)
         dests-to-replace (set (map path-last-part (keys origins-to-replace)))
         unified-dest (->> origins-to-replace vals (apply clojure.set/union))
@@ -54,6 +54,8 @@
          (apply merge {})
          (#(conj % {path-to-close unified-dest}))
          filter-cb-identifiers)))
+
+(def close-graph (memoize close-graph-no-memo))
 
 (deftest clean-file-path-test
   (is (= {"draw_polygon.js<>onStop" #{},

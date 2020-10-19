@@ -9,6 +9,8 @@ You need to replace the files in the directory `interface-files`. The `files-to-
 ```clojure
 {:indentation-level-to-search 8 :file-path "/home/smokeonline/projects/looset/projects-example/Articulate/src/Articulate/Components/ArticulateComponent.cs"}
 ```
+A command that can help you to extract this information is
+- `find . | grep -e <file-extension>$`
 
 The `indentation-level-to-search` is still an analyzis you must do by yourself. If you have code that looks like this
 
@@ -34,14 +36,11 @@ class Container:
         return cls.from_id(client, response['Id'])
 ```
 
-the `indentation-level-to-search` is 4. The `interface-files/closed-dirs.edn` file must have a vector of all directories path. Commands that can help you to extract this information are
-- `tree /home/smokeonline/projects/Articulate/ -fiP *.cs >> interface-files/files-to-analyze.edn`
-- `tree /home/smokeonline/projects/Articulate/ -fid >> interface-files/closed-dirs.edn`
-- or `find . | grep -e cljs$`
+the `indentation-level-to-search` is 4.
 
 Then you can run `lein run` to generate the new `src/ui/initial_state.cljs` file.
 
-The frontend is basically a different project that uses [Figwheel](https://figwheel.org/) to fire up a local server you can run the following commands:
+The frontend is basically a different project that uses [Figwheel](https://figwheel.org/), to fire up a local server you can run the following commands:
 
 `npm install` - Need when running the code for the first time. It install node packages dependencies.
 

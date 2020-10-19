@@ -62,12 +62,25 @@
        (apply (partial merge-with clojure.set/union))
        (filter-cb-identifiers)))
 
+(defn file-paths->sub-dirs [file-paths]
+  (let [split-paths (clojure.string/split (first file-paths) #"/")
+        subpaths-fn (fn [dirs-set acc r]
+                (let [new-acc (str acc "/" (first r))]
+                  (if (empty? r)
+                    dirs-set
+                    (recur (conj dirs-set new-acc)
+                           new-acc
+                           (rest r)))))]
+    (->> file-paths
+         (map #(clojure.string/split % #"/"))
+         (reduce #(subpaths-fn %1 (first %2) (rest %2)) #{}))))
+
 (defn -main []
   (let [files-to-analyze (read-string (slurp "interface-files/files-to-analyze.edn"))
         files-path (mapv :file-path (read-string (slurp "interface-files/files-to-analyze.edn")))
-        closed-dirs (read-string (slurp "interface-files/closed-dirs.edn"))
-        closed-paths (-> (concat files-path closed-dirs)
-                           (zipmap (repeat true)))]
+        closed-paths (-> files-path
+                         file-paths->sub-dirs
+                         (zipmap (repeat true)))]
     (-> files-to-analyze
         (file-list->graph)
         (->> (assoc-in {} [:domain :graph]))
@@ -172,3 +185,33 @@
          (->> [{:indentation-level-to-search 0 :file-path "test/source-code-examples/draw_polygon.js" }
                {:indentation-level-to-search 0 :file-path "test/source-code-examples/simple_select.js" }]
               (file-list->graph)))))
+
+(deftest file-paths->sub-dirs-test
+  (is (= #{"/home" "/home/smokeonline" "/home/smokeonline/projects" "/home/smokeonline/projects/looset" "/home/smokeonline/projects/looset/projects-example"}
+         (file-paths->sub-dirs ["/home/smokeonline/projects/looset/projects-example"])
+         ))
+  (is (= #{"/home" "/home/smokeonline" "/home/smokeonline/projects" "/home/smokeonline/projects/looset"
+           "/home/smokeonline/projects/looset/projects-example"
+           "/home/smokeonline/projects/looset/x"}
+         (file-paths->sub-dirs ["/home/smokeonline/projects/looset/projects-example"
+                                "/home/smokeonline/projects/looset/x"])
+         ))
+  (is (= #{"/home" "/home/smokeonline" "/home/smokeonline/projects" "/home/smokeonline/projects/looset/projects-example"
+           "/home/smokeonline/projects/looset"
+           "/home/smokeonline/projects/looset/projects-example/present-macos"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts/LaunchAtLogin"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts/LaunchAtLogin/LaunchAtLogin"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts/LaunchAtLogin/LaunchAtLogin/LaunchAtLogin.swift"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts/LaunchAtLogin/LaunchAtLoginHelper"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts/LaunchAtLogin/LaunchAtLoginHelper/main.swift"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Pods"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Pods/AXSwift"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Pods/AXSwift/Sources"
+           "/home/smokeonline/projects/looset/projects-example/present-macos/Pods/AXSwift/Sources/AXSwift.swift"}
+         (file-paths->sub-dirs ["/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts/LaunchAtLogin/LaunchAtLogin/LaunchAtLogin.swift"
+                                "/home/smokeonline/projects/looset/projects-example/present-macos/Carthage/Checkouts/LaunchAtLogin/LaunchAtLoginHelper/main.swift"
+                                "/home/smokeonline/projects/looset/projects-example/present-macos/Pods/AXSwift/Sources/AXSwift.swift"])
+         ))
+  )
