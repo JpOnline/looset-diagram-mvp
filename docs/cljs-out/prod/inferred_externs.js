@@ -53,7 +53,6 @@ firebase.apps;
 firebase.apps.length;
 firebase.initializeApp;
 firebase.database;
-TypeError.prototype.toString;
 goog.global;
 goog.global.document;
 goog.DEBUG;

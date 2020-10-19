@@ -25,18 +25,18 @@
     (reagent.dom/render [looset-diagram/view] el)))
 
 (defn query-parameter [parameter]
-  (-> js/window .-location
-      .-search
-      (->> (new js/URLSearchParams))
-      (.get parameter)))
+  (-> js/window .-location .-search (->> (new js/URLSearchParams)) (.get parameter)))
 
 (defn init-state! [state]
   (re-frame/dispatch-sync [::set-app-state state])
   (mount-app-element!))
 
 (defonce startup
+  ;; (init-state! init/initial-state)
+  ;; Code When using Firebase
   (if-let [project-to-load (query-parameter "project")]
     (firebase/async-load project-to-load
                          {:on-success #(init-state! (cljs.reader/read-string %))
                           :on-error   #(init-state! init/initial-state)})
-    (init-state! init/initial-state)))
+    (init-state! init/initial-state))
+  )

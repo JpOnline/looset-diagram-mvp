@@ -125,7 +125,7 @@ return looset_diagram_mvp$ui$looset_diagram$directory_structure_component_$_s__G
 ;
 return new cljs.core.PersistentVector(null, 3, 5, cljs.core.PersistentVector.EMPTY_NODE, [new cljs.core.Keyword(null,">",">",-555517146),looset_diagram_mvp.ui.looset_diagram.global$module$menu_list,cljs.core.map.call(null,dir_structure__GT_menu,looset_diagram_mvp.ui.util._LT_sub.call(null,new cljs.core.PersistentVector(null, 1, 5, cljs.core.PersistentVector.EMPTY_NODE, [new cljs.core.Keyword("looset-diagram-mvp.ui.looset-diagram","graph->dir-structure","looset-diagram-mvp.ui.looset-diagram/graph->dir-structure",-1587366650)], null)))], null);
 });
-looset_diagram_mvp.ui.looset_diagram.draw_graph = (function looset_diagram_mvp$ui$looset_diagram$draw_graph(id,dot_string,options){
+looset_diagram_mvp.ui.looset_diagram.draw_graph_no_memo = (function looset_diagram_mvp$ui$looset_diagram$draw_graph_no_memo(id,dot_string,options){
 return (function (){
 var parsed_data = vis.parseDOTNetwork(dot_string);
 var container = document.getElementById(id);
@@ -133,6 +133,7 @@ var data = ({"nodes": parsed_data.nodes, "edges": parsed_data.edges});
 return (new vis.Network(container,data,options));
 });
 });
+looset_diagram_mvp.ui.looset_diagram.draw_graph = cljs.core.memoize.call(null,looset_diagram_mvp.ui.looset_diagram.draw_graph_no_memo);
 looset_diagram_mvp.ui.looset_diagram.graph_options = (function looset_diagram_mvp$ui$looset_diagram$graph_options(graph_to_draw){
 if((cljs.core.count.call(null,cljs.core.keys.call(null,graph_to_draw)) < (70))){
 return ({});

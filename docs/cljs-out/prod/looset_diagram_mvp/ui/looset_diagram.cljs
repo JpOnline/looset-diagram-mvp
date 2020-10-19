@@ -69,12 +69,14 @@
     [:> material-menu-list
      (map dir-structure->menu (<sub [::graph->dir-structure]))]))
 
-(defn draw-graph [id dot-string options]
+(defn draw-graph-no-memo [id dot-string options]
   (fn []
     (let [parsed-data (-> js/vis (.parseDOTNetwork dot-string))
           container (-> js/document (.getElementById id))
           data #js {:nodes (.-nodes parsed-data) :edges (.-edges parsed-data)}]
       (-> js/vis .-Network (new container data options)))))
+
+(def draw-graph (memoize draw-graph-no-memo))
 
 (defn graph-options
   [graph-to-draw]
