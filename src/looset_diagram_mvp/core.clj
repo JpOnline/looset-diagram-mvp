@@ -47,7 +47,6 @@
   (if (= state next-state)
     (update big-state :token str char)
     (-> big-state
-        (update-in [:token-occurrencies (str token char)] #(if (nil? %) 1 (inc %)))
         (update :token-list conj (-> big-state
                                      (update :token str char)
                                      (select-keys [:token-position :token :category])
@@ -132,8 +131,7 @@
        :state next-state
        :token-position [1 1]
        :category next-state
-       :token-list []
-       :token-occurrencies {}}
+       :token-list []}
       (rest code-to-process))))
 
 (defn file-code-blocks
@@ -151,8 +149,7 @@
   (pprint (reduce lexical-analyzer
           {:position [1 1]
              :char "i"
-             :state :first-char
-             :token-occurrencies {}}
+             :state :first-char}
           "m 'lodash.isequal';"
           #_(drop 5 (take 8 (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")))))
   (pprint (update (generate-token-list
@@ -168,13 +165,16 @@
   (let [file (slurp "test/source-code-examples/api.js")]
     (is (= 12
            (-> (generate-token-list file)
-               :token-occurrencies
-               (get "import" 0)
-               ))))
+               :token-list
+               (->> (map :token))
+               frequencies
+               (get "import" 0)))))
   (let [file (slurp "test/source-code-examples/api.js")]
     (is (= 35
            (-> (generate-token-list file)
-               :token-occurrencies
+               :token-list
+               (->> (map :token))
+               frequencies
                (get "api" 0)
                ))))
   (let [file (take 300 (slurp "test/source-code-examples/api.js"))]
@@ -187,12 +187,13 @@
   (is (= {"abc" 1, "//" 2, "oi" 1, "/" 1 "oci" 1, "lc" 1, "\n" 1, "EOF" 1}
          (-> "abc//w\noi/oci//b\nlc"
              generate-token-list
-             ;; pprint
-             :token-occurrencies
-             )))
+             :token-list
+             (->> (map :token))
+             frequencies)))
   (is (= {"abc" 1, "//" 1, "EOF" 1}
          (-> "abc//woi/oci//blc"
              generate-token-list
-             :token-occurrencies
-             )))
+             :token-list
+             (->> (map :token))
+             frequencies)))
   )

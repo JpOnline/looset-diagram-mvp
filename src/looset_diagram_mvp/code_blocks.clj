@@ -12,7 +12,7 @@
     (= indentation-level indentation-level-to-search) :center
     (> indentation-level indentation-level-to-search) :right))
 
-(defn update-cb-line-id [{:keys [token-occurrencies cb-line-id] :as big-state} {:keys [token]}]
+(defn update-cb-line-id [{:keys [cb-line-id] :as big-state} {:keys [token]}]
   (if (= "EOF" token)
     big-state
     (update big-state :cb-line-id #(conj (or % []) token))))
@@ -302,7 +302,6 @@
     :else
     (-> big-state
         (update :errors conj (-> big-state
-                                 (dissoc :token-occurrencies)
                                  (dissoc :errors))))
     ))
 
@@ -315,7 +314,7 @@
      (let [big-state (process-token (assoc big-state :token token))
            ;; tail (lazy-seq (identifier token-list big-state))
            tail (when (not (:errors big-state)) (lazy-seq (identifier token-list big-state)))]
-       (cons (-> big-state (dissoc :token-list :token-occurrencies))
+       (cons (-> big-state (dissoc :token-list))
              tail)
        #_(str (:state big-state) (apply str tail))))))
 
@@ -325,7 +324,7 @@
                                   {:token "const", :category :word, :position [7 31]}))
    (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/src/looset_diagram_mvp/core.clj")
        lexical-analyzer/generate-token-list
-       (select-keys [:token-list :token-occurrencies])
+       (select-keys [:token-list])
        identifier
        ;; reverse
        last
@@ -341,19 +340,19 @@
   (is (= ["im" "import"]
          (let [initial-value (-> "im import"
                                  (lexical-analyzer/generate-token-list)
-                                 (select-keys [:token-list :token-occurrencies]))]
+                                 (select-keys [:token-list]))]
            (:cb-line-id (last (identifier initial-value))))
          ))
   (is (= ["im" "im" "import"]
          (let [initial-value (-> "im im import"
                                  (lexical-analyzer/generate-token-list)
-                                 (select-keys [:token-list :token-occurrencies]))]
+                                 (select-keys [:token-list]))]
            (:cb-line-id (last (identifier initial-value))))
          ))
   (is (= ["im" "im" "import"]
          (-> "im im import"
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              identifier
              last
              :cb-line-id
@@ -362,28 +361,28 @@
   (is (= {["export" "default" "function" "ctx" "api"] #{"inside"}}
          (-> "export default function(ctx, api) {\n\n  inside\n\n"
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              identifier
              last
              :code-blocks)))
   (is (= {["export" "default" "function" "ctx" "api"] #{"inside"}}
          (->  "export default function(ctx, api)  \n  inside\n\n"
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              identifier
              last
              :code-blocks)))
   (is (= {["export" "default" "function" "ctx" "api"] #{"inside"}}
          (->  "export default function(ctx, api)\n{\n  inside\n\n"
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              identifier
              last
              :code-blocks)))
   (is (= [["const" "featureTypes"] ["export" "default" "function" "ctx" "api"]]
          (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/api.js")
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              identifier
              last
              :code-blocks
@@ -406,7 +405,7 @@
            ["api" "uncombineFeatures" "function"]}
          (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/api.js")
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              (merge {:indentation-level-to-search 2})
              identifier
              last
@@ -416,7 +415,7 @@
   (is (= #{"onSetup" "fireUpdate" "fireActionable" "getUniqueIds" "stopExtendedInteractions" "onStop" "onMouseMove" "onMouseOut" "onTap" "clickAnywhere" "clickOnVertex" "startOnActiveFeature" "clickOnFeature" "onMouseDown" "startBoxSelect" "onTouchStart" "onDrag" "whileBoxSelect" "dragMove" "onMouseUp" "toDisplayFeatures" "onTrash" "onCombineFeatures" "onUncombineFeatures"}
          (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/simple_select.js")
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              (merge {:indentation-level-to-search 0})
              identifier
              last
@@ -427,7 +426,7 @@
   (is (= "EOF"
          (-> (slurp "/home/smokeonline/projects/looset/projects-example/compose/compose/parallel.py")
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              (merge {:indentation-level-to-search 0})
              identifier
              last
@@ -436,7 +435,7 @@
   (is (= "EOF"
          (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/src/looset_diagram_mvp/core.clj")
              lexical-analyzer/generate-token-list
-             (select-keys [:token-list :token-occurrencies])
+             (select-keys [:token-list])
              (merge {:indentation-level-to-search 0})
              identifier
              last

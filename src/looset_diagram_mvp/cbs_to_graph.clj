@@ -11,7 +11,7 @@
   (-> file-path
       slurp
       lexical-analyzer/generate-token-list
-      (select-keys [:token-list :token-occurrencies])
+      (select-keys [:token-list])
       (merge info)
       code-blocks/identifier
       last
