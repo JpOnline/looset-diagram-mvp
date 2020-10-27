@@ -102,6 +102,19 @@
         (recur (rest (drop-while #(not= \newline %) code-to-process)))
         )
 
+    ;; Clojure comment
+    (and (= next-state :symbol)
+         (= \; (first code-to-process) (second code-to-process)))
+    (-> big-state
+        (process-char)
+        (update-in [:position 0] inc)
+        (assoc-in [:position 1] 1)
+        (assoc :category :line-comment)
+        (assoc :token ";")
+        (assoc :char ";")
+        (recur (rest (drop-while #(not= \newline %) code-to-process)))
+        )
+
     :else
     (-> big-state
         (process-char)
@@ -152,19 +165,19 @@
   )
 
 (deftest lexical-analyzer-test
-  (let [file (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")]
+  (let [file (slurp "test/source-code-examples/api.js")]
     (is (= 12
            (-> (generate-token-list file)
                :token-occurrencies
                (get "import" 0)
                ))))
-  (let [file (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js")]
+  (let [file (slurp "test/source-code-examples/api.js")]
     (is (= 35
            (-> (generate-token-list file)
                :token-occurrencies
                (get "api" 0)
                ))))
-  (let [file (take 300 (slurp "/home/smokeonline/projects/looset-diagram-mvp/test/source-code-examples/api.js"))]
+  (let [file (take 300 (slurp "test/source-code-examples/api.js"))]
     (is (= {:token "const", :category :word, :position [7 31]}
            (-> (generate-token-list file)
                :token-list

@@ -17,10 +17,24 @@
       last
       (select-keys [:code-blocks :file-path])))
 
+;; Choose code block id by the identifier that appear less in other code block first lines.
+(defn choose-cb-ids [info-coll]
+  (let [cb-ids-frequencies (->> info-coll
+                                (mapcat :code-blocks)
+                                (keys)
+                                (apply concat)
+                                frequencies)
+        choose-fn (fn [chosen-id candidate]
+                    (if (< (cb-ids-frequencies candidate) (cb-ids-frequencies chosen-id))
+                      candidate
+                      chosen-id))
+        update-cb-ids (fn [[ids-vec value]]
+                        {(reduce choose-fn ids-vec) value})]
+    (map #(update % :code-blocks (fn [cbs] (apply merge (map update-cb-ids cbs)))) info-coll)))
+
 ;; It's better to use with-file-path to avoid duplicated keys
 (defn file-code-blocks-with-file-path [{:keys [file-path] :as info}]
   (->> info
-      file-info-with-code-blocks
       :code-blocks
       (map (fn [[k v]] {(str file-path "<>" k) v}))
       (apply merge)
@@ -56,6 +70,8 @@
 
 (defn file-list->graph [file-list]
   (->> file-list
+       (map file-info-with-code-blocks)
+       (choose-cb-ids)
        (map file-code-blocks-with-file-path)
        (map :code-blocks)
        ;; (apply (partial merge-with (constantly #{"DUPLICATED KEY!!"}))) ;; Use merge-with-key-changer instead?
@@ -144,8 +160,8 @@
           #{"fireActionable"},
           "test/source-code-examples/draw_polygon.js<>onTap"
           #{"clickOnVertex" "clickAnywhere"},
-          "test/source-code-examples/simple_select.js<>onSetup"
-          #{"fireActionable"},
+          "test/source-code-examples/simple_select.js<>opts"
+          #{"fireActionable" "opts"},
           "test/source-code-examples/simple_select.js<>toDisplayFeatures"
           #{"fireActionable"},
           "test/source-code-examples/simple_select.js<>onMouseUp"
@@ -184,7 +200,31 @@
           #{}}
          (->> [{:indentation-level-to-search 0 :file-path "test/source-code-examples/draw_polygon.js" }
                {:indentation-level-to-search 0 :file-path "test/source-code-examples/simple_select.js" }]
-              (file-list->graph)))))
+              (file-list->graph))))
+
+  (is (= {"test/source-code-examples/code_blocks.clj<>code-blocks" #{},
+          "test/source-code-examples/code_blocks.clj<>another-random-def" #{},
+          "test/source-code-examples/code_blocks.clj<>identifier" #{"identifier"},
+          "test/source-code-examples/cbs_to_graph.clj<>cbs-to-graph" #{"code-blocks"},
+          "test/source-code-examples/cbs_to_graph.clj<>random-def" #{"code-blocks" "another-random-def"},
+          "test/source-code-examples/cbs_to_graph.clj<>file-info-with-code-blocks" #{"code-blocks" "identifier"},
+          "test/source-code-examples/cbs_to_graph.clj<>file-code-blocks-with-file-path" #{"code-blocks" "file-info-with-code-blocks"},
+          "test/source-code-examples/cbs_to_graph.clj<>main" #{}}
+         (->> [{:indentation-level-to-search 0 :file-path "test/source-code-examples/code_blocks.clj" }
+               {:indentation-level-to-search 0 :file-path "test/source-code-examples/cbs_to_graph.clj" }]
+              file-list->graph)))
+
+  ;; TODO: Usar frequencias para analisar qual é o cb id considerando todos os arquivos (usar o ident que é menos frequente).
+  ;; Excluir token-occurrencies
+  (is (= (list (list "code-blocks" "another-random-def" "identifier")
+               (list "cbs-to-graph" "random-def" "file-info-with-code-blocks" "file-code-blocks-with-file-path" "main"))
+         (->> [{:indentation-level-to-search 0 :file-path "test/source-code-examples/code_blocks.clj" }
+               {:indentation-level-to-search 0 :file-path "test/source-code-examples/cbs_to_graph.clj" }]
+              (map file-info-with-code-blocks)
+              choose-cb-ids
+              (map :code-blocks)
+              (map keys))))
+  )
 
 (deftest file-paths->sub-dirs-test
   (is (= #{"/home" "/home/smokeonline" "/home/smokeonline/projects" "/home/smokeonline/projects/looset" "/home/smokeonline/projects/looset/projects-example"}

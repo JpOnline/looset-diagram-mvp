@@ -13,12 +13,9 @@
     (> indentation-level indentation-level-to-search) :right))
 
 (defn update-cb-line-id [{:keys [token-occurrencies cb-line-id] :as big-state} {:keys [token]}]
-  (if (nil? cb-line-id)
-    (assoc big-state :cb-line-id token)
-    (assoc big-state :cb-line-id (if (< (token-occurrencies token)
-                                        (token-occurrencies cb-line-id))
-                                   token
-                                   cb-line-id))))
+  (if (= "EOF" token)
+    big-state
+    (update big-state :cb-line-id #(conj (or % []) token))))
 
 (defn update-words-in-cb [{:keys [words-in-cb] :as big-state} {:keys [token]}]
   (if (nil? words-in-cb)
@@ -26,16 +23,11 @@
     (update big-state :words-in-cb conj token)))
 
 (defn record-code-block [{:keys [words-in-cb cb-line-id code-blocks] :as big-state}]
-  (let [duplicated? (when code-blocks (code-blocks cb-line-id))
-        big-state (-> big-state (dissoc :words-in-cb) (dissoc :cb-line-id))
-        cb-line-id (if duplicated? (str cb-line-id "-e") cb-line-id)] ;; Append extra string to duplicated name.
+  (let [big-state (-> big-state (dissoc :words-in-cb) (dissoc :cb-line-id))]
     (if (empty? words-in-cb)
       big-state
-      (-> big-state
-        (update :code-blocks merge {cb-line-id words-in-cb})
-        (as-> $ (if (not duplicated?)
-                $
-                (update $ :errors conj {:duplicated-code-block cb-line-id})))))))
+      (update big-state :code-blocks merge {cb-line-id words-in-cb})
+      )))
 
 ;; Order
 ;; center, right, left
@@ -316,7 +308,7 @@
 
 (defn identifier
   ([{:keys [token-list] :as big-state}]
-   (identifier token-list (merge {:state :initial-state :indentation-level-to-search 0 :indentation-level 0}
+   (identifier token-list (merge {:state :initial-state :indentation-level-to-search 0 :indentation-level 0 :cb-id-occurrencies {}}
                                  (dissoc big-state :token-list))))
   ([[token & token-list] big-state]
    (when token
@@ -346,19 +338,19 @@
   )
 
 (deftest identifier-test
-  (is (= "im"
+  (is (= ["im" "import"]
          (let [initial-value (-> "im import"
                                  (lexical-analyzer/generate-token-list)
                                  (select-keys [:token-list :token-occurrencies]))]
            (:cb-line-id (last (identifier initial-value))))
          ))
-  (is (= "import"
+  (is (= ["im" "im" "import"]
          (let [initial-value (-> "im im import"
                                  (lexical-analyzer/generate-token-list)
                                  (select-keys [:token-list :token-occurrencies]))]
            (:cb-line-id (last (identifier initial-value))))
          ))
-  (is (= "import"
+  (is (= ["im" "im" "import"]
          (-> "im im import"
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
@@ -367,28 +359,28 @@
              :cb-line-id
              ;; pprint
              )))
-  (is (= {"export" #{"inside"}}
+  (is (= {["export" "default" "function" "ctx" "api"] #{"inside"}}
          (-> "export default function(ctx, api) {\n\n  inside\n\n"
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
              identifier
              last
              :code-blocks)))
-  (is (= {"export" #{"inside"}}
+  (is (= {["export" "default" "function" "ctx" "api"] #{"inside"}}
          (->  "export default function(ctx, api)  \n  inside\n\n"
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
              identifier
              last
              :code-blocks)))
-  (is (= {"export" #{"inside"}}
+  (is (= {["export" "default" "function" "ctx" "api"] #{"inside"}}
          (->  "export default function(ctx, api)\n{\n  inside\n\n"
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
              identifier
              last
              :code-blocks)))
-  (is (= ["featureTypes" "export"]
+  (is (= [["const" "featureTypes"] ["export" "default" "function" "ctx" "api"]]
          (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/api.js")
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
@@ -396,7 +388,22 @@
              last
              :code-blocks
              keys)))
-  (is (= #{"getFeatureIdsAt" "getSelectedIds" "getSelected" "getSelectedPoints" "set" "add" "get" "getAll" "delete" "deleteAll" "changeMode" "getMode" "trash" "combineFeatures" "uncombineFeatures" "setFeatureProperty"}
+  (is (= #{["api" "changeMode" "function" "mode" "modeOptions"]
+           ["api" "getSelectedIds" "function"]
+           ["api" "combineFeatures" "function"]
+           ["api" "getAll" "function"]
+           ["api" "getFeatureIdsAt" "function" "point"]
+           ["api" "trash" "function"]
+           ["api" "deleteAll" "function"]
+           ["api" "set" "function" "featureCollection"]
+           ["api" "delete" "function" "featureIds"]
+           ["api" "getSelectedPoints" "function"]
+           ["api" "add" "function" "geojson"]
+           ["api" "setFeatureProperty" "function" "featureId" "property" "value"]
+           ["api" "get" "function" "id"]
+           ["api" "getMode" "function"]
+           ["api" "getSelected" "function"]
+           ["api" "uncombineFeatures" "function"]}
          (-> (slurp "/home/smokeonline/projects/looset/diagram-mvp/test/source-code-examples/api.js")
              lexical-analyzer/generate-token-list
              (select-keys [:token-list :token-occurrencies])
@@ -415,8 +422,8 @@
              last
              :code-blocks
              keys
-             set
-             )))
+             (->> (mapv second))
+             set)))
   (is (= "EOF"
          (-> (slurp "/home/smokeonline/projects/looset/projects-example/compose/compose/parallel.py")
              lexical-analyzer/generate-token-list
