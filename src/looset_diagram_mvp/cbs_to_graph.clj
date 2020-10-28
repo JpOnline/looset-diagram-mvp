@@ -8,6 +8,8 @@
     ))
 
 (defn file-info-with-code-blocks [{:keys [file-path] :as info}]
+  (print (str "\r" "Analyzing " file-path))
+  (flush)
   (-> file-path
       slurp
       lexical-analyzer/generate-token-list
@@ -91,6 +93,55 @@
          (map #(clojure.string/split % #"/"))
          (reduce #(subpaths-fn %1 (first %2) (rest %2)) #{}))))
 
+(def default-file-extensions
+  (clojure.string/join "|" ["html" "css" ;; Web
+                            "clj" "cljs" "cljc" ;; Clojure(script)
+                            "js" ;; Javascript
+                            "erl" ;; Erlang
+                            "ex" "exs" ;; Elixir
+                            "elm"
+                            "hs" ;; Haskell
+                            "scala"
+                            "rs" ;; Rust
+                            "fs" ;; F#
+                            "swift"
+                            "vue" "jsx" ;; Web frameworks
+                            "c" "cpp"
+                            "java"
+                            "py" ;; Python
+                            "cs" ;; C#
+                            "vb" ;; Visual Basic
+                            "php"
+                            "R"
+                            "perl"
+                            "groovy"
+                            "rb" ;; Ruby
+                            "go"
+                            "kt" "kts" "ktm" ;; Kotlin
+                            "m" ;; MATLAB or Objective-C
+                            "sh" ;; Bash
+                            "lua"
+                            "cbl" ;; Cobol
+                            "lol" ;; Lolcode
+                            "rkt" "ss" "scm" "sch" ;; Racket
+                            "rei" ;; ReasonMl
+                            "purs" ;; PureScript
+                            ]))
+
+#_(defn get-files-to-analyze [{:keys [use-gitignore paths file-extensions indentation-level-to-search]
+                             :or {file-extensions default-file-extensions
+                                  indentation-level-to-search 0}}]
+  (let [get-out #(if (zero? (:exit %)) (:out %) (throw (Exception. (:err %))))
+        get-files-command (if use-gitignore
+                            (str "cd "(first paths)" && git ls-files")
+                            (str "find "(clojure.string/join " " paths)))]
+    (-> (str get-files-command" | grep -E \".("file-extensions")$\"")
+        (->> (shell/sh "bash" "-c"))
+        get-out
+        (clojure.string/split #"\n")
+        (->> (map #(into {:indentation-level-to-search indentation-level-to-search :file-path %})))
+        (as-> $ (with-out-str (pprint $))))))
+
 (defn -main []
   (let [files-to-analyze (read-string (slurp "interface-files/files-to-analyze.edn"))
         files-path (mapv :file-path (read-string (slurp "interface-files/files-to-analyze.edn")))
@@ -101,34 +152,68 @@
         (file-list->graph)
         (->> (assoc-in {} [:domain :graph]))
         (assoc-in [:ui :closed-dirs] closed-paths)
-        (->> (str "(ns looset-diagram-mvp.ui.initial-state)\n\n(def initial-state\n  "))
-        (str ")")
+        list
+        (->> (concat '(def initial-state)))
+        (as-> $ (with-out-str (pprint $)))
+        (->> (str "(ns looset-diagram-mvp.ui.initial-state)\n\n"))
+        ;; Would you preffer to export to an edn file?
         (->> (spit "src/looset_diagram_mvp/ui/initial_state.cljs"))
         )))
 
 (comment
-  (read-string (slurp "/home/smokeonline/projects/looset/looset-diagram-mvp/tmp.txt"))
-  (zipmap ["x" "y"] (repeat true))
-  (spit "src/looset_diagram_mvp/ui/i.cljs" (str "(ns looset-diagram-mvp.ui.initial-state)\n\n(def initial-state\n  " {:t true} ")"))
-  (-> (slurp "/home/smokeonline/projects/looset/looset-diagram-mvp/closed-dirs.edn")
-      read-string
-      (zipmap (repeat true))
-      pprint
-      )
-  (-> (read-string (slurp "/home/smokeonline/projects/looset/looset-diagram-mvp/files-to-analyze.edn"))
-       (file-list->graph)
-       (->> (assoc-in {} [:domain :graph]))
-       ;; pprint
-       (assoc-in [:ui :closed-dirs] {
-                                     "src/Articulate.Web/App_Plugins/Articulate/BackOffice/ArticulateThemes/delete.controller.js" true
-                                     "src/Articulate.Web/config/grid.editors.config.js" true
-                                     "src/Articulate.Web/media" true
-                                     "src" true
-                                     })
-       ;; (assoc-in [:ui :project-link :text] "See mapbox-gl-draw on Github")
-       ;; (assoc-in [:ui :project-link :href] "https://github.com/mapbox/mapbox-gl-draw/tree/897a8a8cb9d035ef1e8ec1f11de6766df89db76d/src")
-       ;; (->> (spit "tmp.txt"))
-       )
+  (require '[clojure.java.shell :as shell])
+  (shell/sh "bash" "-c" "cd .. && ls")
+  (loop [c 1]
+    (if (= c 50)
+      (print c)
+      (do (Thread/sleep 100)
+          (print "\r" c)
+          (flush)
+          (recur (inc c)))))
+
+  (shell/sh "git" "ls-files")
+
+  (let [file-extensions (clojure.string/join "|" ["html" "css" ;; Web
+                                                  "clj" "cljs" "cljc" ;; Clojure(script)
+                                                  "js" ;; Javascript
+                                                  "erl" ;; Erlang
+                                                  "ex" "exs" ;; Elixir
+                                                  "elm"
+                                                  "hs" ;; Haskell
+                                                  "scala"
+                                                  "rs" ;; Rust
+                                                  "fs" ;; F#
+                                                  "swift"
+                                                  "vue" "jsx" ;; Web frameworks
+                                                  "c" "cpp"
+                                                  "java"
+                                                  "py" ;; Python
+                                                  "cs" ;; C#
+                                                  "vb" ;; Visual Basic
+                                                  "php"
+                                                  "R"
+                                                  "perl"
+                                                  "groovy"
+                                                  "rb" ;; Ruby
+                                                  "go"
+                                                  "kt" "kts" "ktm" ;; Kotlin
+                                                  "m" ;; MATLAB or Objective-C
+                                                  "sh" ;; Bash
+                                                  "lua"
+                                                  "cbl" ;; Cobol
+                                                  "lol" ;; Lolcode
+                                                  "rkt" "ss" "scm" "sch" ;; Racket
+                                                  "rei" ;; ReasonMl
+                                                  "purs" ;; PureScript
+                                                  ])]
+    (-> (shell/sh "bash" "-c" (str "find ./srcx | grep -E \".("file-extensions")$\""))
+        ;; :out
+        ;; (clojure.string/split #"\n")
+        ;; (->> (map #(into {:x 0 :y %})))
+        print
+        ;; (as-> $ (with-out-str (pprint $)))
+        )
+    )
   )
 
 (deftest from-file-list-test
@@ -214,8 +299,6 @@
                {:indentation-level-to-search 0 :file-path "test/source-code-examples/cbs_to_graph.clj" }]
               file-list->graph)))
 
-  ;; TODO: Usar frequencias para analisar qual é o cb id considerando todos os arquivos (usar o ident que é menos frequente).
-  ;; Excluir token-occurrencies
   (is (= (list (list "code-blocks" "another-random-def" "identifier")
                (list "cbs-to-graph" "random-def" "file-info-with-code-blocks" "file-code-blocks-with-file-path" "main"))
          (->> [{:indentation-level-to-search 0 :file-path "test/source-code-examples/code_blocks.clj" }

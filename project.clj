@@ -2,10 +2,11 @@
   :url "https://jponline.github.io/looset-landing/#looset-diagram"
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/clojurescript "1.10.597"]
+                 [org.clojure/tools.cli "1.0.194"]
                  [re-frame "0.12.0"]
                  [reagent "0.10.0"]]
   :repl-options {:init-ns looset-diagram-mvp.core}
-  :main looset-diagram-mvp.cbs-to-graph
+  :main looset-diagram-mvp.cli
 
   :source-paths ["src"]
 
