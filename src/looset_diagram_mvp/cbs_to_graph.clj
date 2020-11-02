@@ -1,5 +1,6 @@
 (ns looset-diagram-mvp.cbs-to-graph
   (:require
+    [clojure.java.shell :as shell]
     [looset-diagram-mvp.code-blocks :as code-blocks]
     [looset-diagram-mvp.core :as lexical-analyzer]
 
@@ -7,7 +8,7 @@
     [clojure.pprint :refer [pprint]]
     ))
 
-(defn file-info-with-code-blocks [{:keys [file-path] :as info}]
+(defn- file-info-with-code-blocks [{:keys [file-path] :as info}]
   (print (str "\r" "Analyzing " file-path))
   (flush)
   (-> file-path
@@ -20,22 +21,25 @@
       (select-keys [:code-blocks :file-path])))
 
 ;; Choose code block id by the identifier that appear less in other code block first lines.
-(defn choose-cb-ids [info-coll]
+(defn- choose-cb-ids [info-coll]
   (let [cb-ids-frequencies (->> info-coll
                                 (mapcat :code-blocks)
                                 (keys)
                                 (apply concat)
                                 frequencies)
-        choose-fn (fn [chosen-id candidate]
+        choose-fn (fn choose-fn [chosen-id candidate]
                     (if (< (cb-ids-frequencies candidate) (cb-ids-frequencies chosen-id))
                       candidate
                       chosen-id))
-        update-cb-ids (fn [[ids-vec value]]
-                        {(reduce choose-fn ids-vec) value})]
-    (map #(update % :code-blocks (fn [cbs] (apply merge (map update-cb-ids cbs)))) info-coll)))
+        update-cb-ids (fn update-cb-ids [[ids-vec value]]
+                        (when ids-vec
+                          {(reduce choose-fn ids-vec) value}))
+        update-code-blocks #(update % :code-blocks (fn [cbs] (apply merge (map update-cb-ids cbs))))]
+    (map update-code-blocks info-coll)
+    ))
 
 ;; It's better to use with-file-path to avoid duplicated keys
-(defn file-code-blocks-with-file-path [{:keys [file-path] :as info}]
+(defn- file-code-blocks-with-file-path [{:keys [file-path] :as info}]
   (->> info
       :code-blocks
       (map (fn [[k v]] {(str file-path "<>" k) v}))
@@ -56,13 +60,13 @@
                    (reduce1 merge-entry (or m1 {}) (seq m2)))]
       (reduce1 merge2 maps))))
 
-(defn path-last-part [path]
+(defn- path-last-part [path]
   (if (re-find #"^.*<>" path)
     (clojure.string/replace path #"^.*<>" "")
     (->> path clojure.string/reverse (re-find #"^[^/]*") clojure.string/reverse)
     ))
 
-(defn filter-cb-identifiers [code-blocks]
+(defn- filter-cb-identifiers [code-blocks]
   (let [cb-identifiers (-> code-blocks
                            keys
                            (->> (map path-last-part))
@@ -70,7 +74,7 @@
                            (conj "DUPLICATED KEY!!"))]
     (apply merge (map (fn [[k v]] {k (set (filter cb-identifiers v))}) code-blocks))))
 
-(defn file-list->graph [file-list]
+(defn- file-list->graph [file-list]
   (->> file-list
        (map file-info-with-code-blocks)
        (choose-cb-ids)
@@ -80,7 +84,7 @@
        (apply (partial merge-with clojure.set/union))
        (filter-cb-identifiers)))
 
-(defn file-paths->sub-dirs [file-paths]
+(defn- file-paths->sub-dirs [file-paths]
   (let [split-paths (clojure.string/split (first file-paths) #"/")
         subpaths-fn (fn [dirs-set acc r]
                 (let [new-acc (str acc "/" (first r))]
@@ -128,23 +132,31 @@
                             "purs" ;; PureScript
                             ]))
 
-#_(defn get-files-to-analyze [{:keys [use-gitignore paths file-extensions indentation-level-to-search]
-                             :or {file-extensions default-file-extensions
-                                  indentation-level-to-search 0}}]
+(defn- get-files-to-analyze [dirs-to-analyze
+                             {:keys [use-gitignore file-extensions indentation-level-to-search]
+                              :or {file-extensions default-file-extensions
+                                   indentation-level-to-search 0}}]
   (let [get-out #(if (zero? (:exit %)) (:out %) (throw (Exception. (:err %))))
+        dirs (if use-gitignore (first dirs-to-analyze) (clojure.string/join " " dirs-to-analyze))
         get-files-command (if use-gitignore
-                            (str "cd "(first paths)" && git ls-files")
-                            (str "find "(clojure.string/join " " paths)))]
-    (-> (str get-files-command" | grep -E \".("file-extensions")$\"")
+                            (str "cd "dirs" && git ls-files")
+                            (str "find "dirs))]
+    (print (str "\r" "Discoverying files in "dirs))
+    (flush)
+    (-> (str get-files-command" | grep -E \"\\.("file-extensions")$\"")
         (->> (shell/sh "bash" "-c"))
         get-out
         (clojure.string/split #"\n")
-        (->> (map #(into {:indentation-level-to-search indentation-level-to-search :file-path %})))
-        (as-> $ (with-out-str (pprint $))))))
+        (->> (mapv #(into {:indentation-level-to-search indentation-level-to-search :file-path %})))
+        (#(do (print (str "\r" (count %) " files discovered."\newline)) (flush) %)))))
 
-(defn -main []
-  (let [files-to-analyze (read-string (slurp "interface-files/files-to-analyze.edn"))
-        files-path (mapv :file-path (read-string (slurp "interface-files/files-to-analyze.edn")))
+(defn gen-interface-files-to-analyze [dirs-to-analyze options]
+  (->> (get-files-to-analyze dirs-to-analyze options)
+       (#(with-out-str (pprint %)))
+       (spit "interface-files/files-to-analyze.edn")))
+
+(defn- analyze-files [files-to-analyze]
+  (let [files-path (mapv :file-path files-to-analyze)
         closed-paths (-> files-path
                          file-paths->sub-dirs
                          (zipmap (repeat true)))]
@@ -159,6 +171,18 @@
         ;; Would you preffer to export to an edn file?
         (->> (spit "src/looset_diagram_mvp/ui/initial_state.cljs"))
         )))
+
+(defn -main [dirs-to-analyze {:keys [files-to-analyze-default files-to-analyze-location] :as options}]
+  (let [files-to-analyze (cond
+                           files-to-analyze-default
+                           (read-string (slurp "interface-files/files-to-analyze.edn"))
+                           
+                           files-to-analyze-location
+                           (read-string (slurp files-to-analyze-location))
+
+                           :else
+                           (get-files-to-analyze dirs-to-analyze options))]
+    (analyze-files files-to-analyze)))
 
 (comment
   (require '[clojure.java.shell :as shell])
@@ -215,6 +239,14 @@
         )
     )
   )
+
+(deftest get-files-to-analyze-test
+  (is (= 379
+         (count (get-files-to-analyze ["../projects-example/draw-map-shape"] {}))))
+  (is (= 3
+         (count (get-files-to-analyze ["../projects-example/draw-map-shape"] {:file-extensions "css|svg"}))))
+  (is (= 378
+         (count (get-files-to-analyze ["../projects-example/draw-map-shape"] {:use-gitignore true})))))
 
 (deftest from-file-list-test
   (is (= {"test/source-code-examples/draw_polygon.js<>onStop"
@@ -307,7 +339,14 @@
               choose-cb-ids
               (map :code-blocks)
               (map keys))))
-  )
+  (is (= ["demo-blog" "mdl-textfield" "button" "comment__header" "comment__text" "comment__actions" "comment__answers"]
+         (->> [{:file-path "../projects-example/Articulate/src/Articulate.Web/App_Plugins/Articulate/Themes/Material/Assets/css/styles.css" :indentation-level-to-search 8}]
+              (map file-info-with-code-blocks)
+              choose-cb-ids
+              (map :code-blocks)
+              (map keys)
+              first
+              vec))))
 
 (deftest file-paths->sub-dirs-test
   (is (= #{"/home" "/home/smokeonline" "/home/smokeonline/projects" "/home/smokeonline/projects/looset" "/home/smokeonline/projects/looset/projects-example"}

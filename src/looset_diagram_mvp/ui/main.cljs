@@ -32,11 +32,11 @@
   (mount-app-element!))
 
 (defonce startup
-  (init-state! init/initial-state)
-  ;; ;; Code When using Firebase
-  ;; (if-let [project-to-load (query-parameter "project")]
-  ;;   (firebase/async-load project-to-load
-  ;;                        {:on-success #(init-state! (cljs.reader/read-string %))
-  ;;                         :on-error   #(init-state! init/initial-state)})
-  ;;   (init-state! init/initial-state))
+  ;; (init-state! init/initial-state)
+  ;; Code When using Firebase
+  (if-let [project-to-load (query-parameter "project")]
+    (firebase/async-load project-to-load
+                         {:on-success #(init-state! (cljs.reader/read-string %))
+                          :on-error   #(init-state! init/initial-state)})
+    (init-state! init/initial-state))
   )

@@ -4,57 +4,47 @@
     [clojure.tools.cli]
     [looset-diagram-mvp.cbs-to-graph :as cbs-to-graph]
 
-    [clojure.test :refer :all]
+    [clojure.java.shell :as shell]
     [clojure.pprint :refer [pprint]]
+    [clojure.test :refer :all]
     )
   (:gen-class))
-
-;; (def cbs-to-graph-options)
-
-(def cli-options
-  [;; First three strings describe a short-option, long-option with optional
-   ;; example argument description, and a description. All three are optional
-   ;; and positional.
-   
-   ["-H" "--hostname HOST" "Remote host"
-    ;; :default (str "jp default")
-    ;; Specify a string to output in the default column in the options summary
-    ;; if the default value's string representation is very ugly
-    :default-desc "localhost"
-    #_#_:parse-fn #(str %)]
-   ;; If no required argument description is given, the option is assumed to
-   ;; be a boolean option defaulting to nil
-   [nil "--detach" "Detach from controlling process"]
-   ["-v" nil "Verbosity level; may be specified multiple times to increase value"
-    ;; If no long-option is specified, an option :id must be given
-    :id :verbosity
-    :default 0
-    ;; Use :update-fn to create non-idempotent options (:default is applied first)
-    :update-fn inc]
-   ["-f" "--file NAME" "File names to read"
-    ;; :update-fn conj
-    :multi true ; use :update-fn to combine multiple instance of -f/--file
-    :default []
-    ;; with :multi true, the :update-fn is passed both the existing parsed
-    ;; value(s) and the new parsed value from each option
-    ]
-   ;; A boolean option that can explicitly be set to false
-   ["-d" "--[no-]daemon" "Daemonize the process" :default true]
-   ["-h" "--help"]])
 
 (defn usage [options-summary]
   (->> ["Looset diagram automatically generates a graph of dependencies by analyzing the Code Blocks of your project."
         ""
-        "Usage: lein run <path-to-project> [options]"
+        "Usage: lein run <dirs-to-analyze> [options]"
+        "or lein run gen-interface-files-to-analyze <dirs-to-analyze> [options]"
         ""
         "Options:"
         options-summary
+        ""
+        "Examples:"
+        ". --use-gitignore                                                               Analyze looset-diagram-mvp itself."
+        "../projects-example/mapbox-gl-draw/src ../projects-example/mapbox-gl-draw/test  Analyze files only from these dirs. "
+        "../projects-example/Articulate/ --file-extensions c|cpp                         Analyze the given file extensions, e.g. c|cpp|asm."
+        "gen-interface-files-to-analyze ../projects-example/Articulate/                  Do not analyze, only spit the discoverd files in interface-files/files-to-analyze.edn."
+        "gen-interface-files-to-analyze ../projects-example/Articulate/ --indentation-level-to-search 4"
+        "--files-to-analyze-default                                                      Use the file list described in interface-files/files-to-analyze.edn."
+        "--files-to-analyze-location interface-files/files-to-analyze.edn                Use the file list described in interface-files/files-to-analyze.edn."
         ]
        (string/join \newline)))
 
 (defn error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
        (string/join \newline errors)))
+
+(def cbs-to-graph-options
+  [["-g" "--use-gitignore" "Analyze files specified in a git repository."]
+   ["-d" "--files-to-analyze-default" "Analyze files specified in interface-files/files-to-analyze.edn."]
+   ["-l" "--files-to-analyze-location <path>" "Analyze files specified in the file input."]
+   ["-f" "--file-extensions <ext>[|...ext-n]" "Only analyze files with the given extension. E.g. js|jsx|css|rb"]
+   ["-i" "--indentation-level-to-search n" "Assume Code Blocks of all files start in the given column number. Use the action gen-interface-files-to-analyze to specify it by file."
+    :validate [#(>= % 0) "Must be a number"]
+    :parse-fn #(Integer/parseInt %)
+    :default 0]
+   ["-h" "--help" "Show this help and exit."]
+   ])
 
 (defn validate-args
   "Validate command line arguments. Either return a map indicating the program
@@ -69,11 +59,18 @@
       errors ; errors => exit with description of errors
       {:exit-message (error-msg errors)}
 
-      (:files-to-analyze-default options)
-      {:action "analyze"}
+      (some #{:files-to-analyze-default :files-to-analyze-location} (keys options))
+      {:action "analyze" :options options}
+
+      (and (= "gen-interface-files-to-analyze" (first arguments))
+           (empty? (rest arguments)))
+      {:exit-message "Please provide a path for a software project directory to be analyzed."}
+
+      (= "gen-interface-files-to-analyze" (first arguments))
+      {:action "gen-interface-files-to-analyze" :dirs-to-analyze (rest arguments) :options options}
 
       (> (count arguments) 0)
-      {:action (first arguments) :options options}
+      {:action "analyze" :dirs-to-analyze arguments :options options}
 
       :else ; failed custom validation => exit with usage summary
       {:exit-message (usage summary)})))
@@ -83,28 +80,22 @@
   (System/exit status))
 
 (defn -main [& args]
-  (let [{:keys [action options exit-message ok?]} (validate-args args)]
+  (let [{:keys [action dirs-to-analyze options exit-message ok?]} (validate-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (case action
-        "gen-interface-file" (cbs-to-graph/-main)
-        "analyze" (cbs-to-graph/-main)
+        "gen-interface-files-to-analyze" (cbs-to-graph/gen-interface-files-to-analyze dirs-to-analyze options)
+        "analyze" (cbs-to-graph/-main dirs-to-analyze options)
         ))))
 
-(def cbs-to-graph-options
-  [["-g" "--use-gitignore" "Analyze files specified in a git repository."]
-   ["-d" "--files-to-analyze-default" "Ignore file paths and use the interface-files/files-to-analyze.edn."]
-   ["-h" "--help" "Show this help and exit."]
-   ])
-
-(deftest files-to-analyze-test
+(deftest files-to-analyze-default-test
   (testing "parse-opts"
     (is (= true
            (:files-to-analyze-default (:options (clojure.tools.cli/parse-opts ["--files-to-analyze-default"] cbs-to-graph-options))))))
   (testing "validate-args"
     (is (= "analyze"
            (:action (validate-args ["--files-to-analyze-default"])))))
-  (testing "main"
+  (testing "main\n"
     ;; Arrange
     (require '[clojure.java.shell :as shell])
     (shell/sh "mv" "interface-files/files-to-analyze.edn" "interface-files/files-to-analyze.edn.changed-while-testing")
@@ -122,48 +113,79 @@
     (shell/sh "mv" "interface-files/files-to-analyze.edn.changed-while-testing" "interface-files/files-to-analyze.edn")
     (shell/sh "mv" "src/looset_diagram_mvp/ui/initial_state.cljs.changed-while-testing" "src/looset_diagram_mvp/ui/initial_state.cljs")))
 
-(deftest choose-file-test
-  (is (= 1
-         (pprint (clojure.tools.cli/parse-opts ["." "--use-gitignore"] cbs-to-graph-options)) ;; Analyze looset-diagram-mvp itself
-         (pprint (clojure.tools.cli/parse-opts ["../projects-example/Articulate/"] cbs-to-graph-options))
-         (pprint (clojure.tools.cli/parse-opts ["../projects-example/Articulate/" "--file-extensions" "c|cpp"] cbs-to-graph-options)) ;; Analyze the given file extensions, e.g. c|cpp|asm
-         (pprint (clojure.tools.cli/parse-opts ["../projects-example/mapbox-gl-draw/src" "../projects-example/mapbox-gl-draw/test"] cbs-to-graph-options)) ;; Analyze files only from these dirs
-         (pprint (clojure.tools.cli/parse-opts ["../projects-example/mapbox-gl-draw/src" "../projects-example/mapbox-gl-draw/test" "--use-gitignore"] cbs-to-graph-options)) ;; It will analyze the whole git project
-         (pprint (clojure.tools.cli/parse-opts ["gen-interface-files-to-analyze ../projects-example/Articulate/"] cbs-to-graph-options)) ;; Do not analyze, only spit in interface-files/files-to-analyze.edn
-         (pprint (clojure.tools.cli/parse-opts ["gen-interface-files-to-analyze ../projects-example/Articulate/" --indentation-level-to-search 4] cbs-to-graph-options))
-         (pprint (clojure.tools.cli/parse-opts ["--files-to-analyze-default"] cbs-to-graph-options)) ;; Ignore file paths and use the interface-files/files-to-analyze.edn
-         (pprint (clojure.tools.cli/parse-opts ["--files-to-analyze" "interface-files/files-to-analyze.edn"] cbs-to-graph-options)) ;; Ignore file paths and use the given file to specify which files to analyze
-         )))
+(deftest gen-interface-files-to-analyze-test
+  (testing "parse-opts"
+    (is (= ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape"]
+           (:arguments (clojure.tools.cli/parse-opts ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape"] cbs-to-graph-options)))))
+  (testing "validate-args"
+    (is (= "gen-interface-files-to-analyze"
+           (:action (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape"]))))
+    (is (= ["../projects-example/draw-map-shape"]
+           (:dirs-to-analyze (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape"]))))
+    (is (= ["../projects-example/draw-map-shape" "../projects-example/some-other"]
+           (:dirs-to-analyze (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape" "../projects-example/some-other"])))))
+  (testing "validate-args indentation-level-to-search"
+    (is (= 4
+           (:indentation-level-to-search (:options (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape" "--indentation-level-to-search" "4"])))))
+    (is (= true
+           (:use-gitignore (:options (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape" "--use-gitignore"]))))))
+  (testing "validate-args use-gitignore"
+    (is (= nil
+           (:use-gitignore (:options (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape"])))))
+    (is (= true
+           (:use-gitignore (:options (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape" "-g"])))))
+    (is (= true
+           (:use-gitignore (:options (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape" "--use-gitignore"]))))))
+  (testing "validate-args file-extensions"
+    (is (= "css|svg"
+           (:file-extensions (:options (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape" "-f" "css|svg"])))))
+    (is (= "css|svg"
+           (:file-extensions (:options (validate-args ["gen-interface-files-to-analyze" "../projects-example/draw-map-shape" "--file-extensions" "css|svg"]))))))
+  (testing "main"
+    ;; Arrange
+    (require '[clojure.java.shell :as shell])
+    (shell/sh "mv" "interface-files/files-to-analyze.edn" "interface-files/files-to-analyze.edn.changed-while-testing")
 
-(deftest gen-interface-file-test
-  (-main "gen-interface-file" "../projects-example/draw-map-shape")
-  )
+    ;; Test
+    (-main "gen-interface-files-to-analyze" "../projects-example/draw-map-shape")
 
-(deftest use-gitignore-test
-  (is (= true
-         (:use-gitignore (:options (clojure.tools.cli/parse-opts ["--use-gitignore"] cbs-to-graph-options)))
-         ))
-  (is (= nil
-         (:use-gitignore (:options (clojure.tools.cli/parse-opts [] cbs-to-graph-options)))
-         ))
-  (is (= ["."]
-         (:arguments (clojure.tools.cli/parse-opts ["." "--use-gitignore"] cbs-to-graph-options))
-         ))
-  #_(is (= nil
-         (print (validate-args ["." "--use-gitignore"]))
-         ))
-  )
+    ;; Assert
+    (is (= 379
+           (count (read-string (slurp "interface-files/files-to-analyze.edn")))))
 
-(deftest file-path-argument-test
-  (is (= nil
-       (pprint (validate-args ["../projects-example/Articulate/"]))
-       ))
-  )
+    ;; Clean up
+    (shell/sh "mv" "interface-files/files-to-analyze.edn.changed-while-testing" "interface-files/files-to-analyze.edn")))
 
-(deftest interface-files-test
-  (is (= nil
-        (pprint (clojure.tools.cli/parse-opts ["--files-to-analyze-default"] cbs-to-graph-options)) ;; Ignore file paths and use the interface-files/files-to-analyze.edn
-        ))
-  )
+(deftest files-to-analyze-test
+  (testing "parse-opts"
+    (is (= "interface-files/other-file.edn"
+           (:files-to-analyze-location (:options (clojure.tools.cli/parse-opts ["--files-to-analyze-location" "interface-files/other-file.edn"] cbs-to-graph-options))))))
+  (testing "validate-args"
+    (is (= "/some/path"
+           (:files-to-analyze-location (:options (validate-args ["--files-to-analyze-location" "/some/path"]))))))
+  (testing "main"
+    ;; Arrange
+    (require '[clojure.java.shell :as shell])
+    (shell/sh "mv" "src/looset_diagram_mvp/ui/initial_state.cljs" "src/looset_diagram_mvp/ui/initial_state.cljs.changed-while-testing")
+    (spit "interface-files/another-path.edn" [{:indentation-level-to-search 0 :file-path "test/source-code-examples/cbs_to_graph.clj"}
+                                              {:indentation-level-to-search 0 :file-path "test/source-code-examples/code_blocks.clj"}])
+    ;; Test
+    (-main "--files-to-analyze-location" "interface-files/another-path.edn")
 
+    ;; Assert
+    (is (= (slurp "src/looset_diagram_mvp/ui/initial_state.cljs")
+           (slurp "test/file-results/files-to-analyze-test")))
 
+    ;; Clean up
+    (shell/sh "rm" "interface-files/another-path.edn")
+    (shell/sh "mv" "src/looset_diagram_mvp/ui/initial_state.cljs.changed-while-testing" "src/looset_diagram_mvp/ui/initial_state.cljs")))
+
+(deftest analyze-test
+  (testing "parse-opts"
+    (is (= 8
+           (:indentation-level-to-search (:options (clojure.tools.cli/parse-opts ["../projects-example/Articulate/" "-i" "8"] cbs-to-graph-options))))) 
+    (is (= ["../projects-example/Articulate/"]
+           (:arguments (clojure.tools.cli/parse-opts ["../projects-example/Articulate/" "-i" "8"] cbs-to-graph-options)))))
+  (testing "validate-args"
+    (is (= "analyze"
+           (:action (validate-args ["../projects-example/Articulate/" "-i" "8"]))))))
